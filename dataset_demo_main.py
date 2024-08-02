@@ -7,8 +7,9 @@ def dataset_demo():
     # Generate dataset object
     dataset = CORE50DataLoader(
         root="core50/data",
-        original_image_size=(128, 128),
-        input_image_size=(128, 128),
+        original_image_size=(350, 350),
+        input_image_size=(384, 384),
+        resize_procedure="border",
         channels=3,
         scenario="ni",
         load_entire_batch=False,

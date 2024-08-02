@@ -13,6 +13,7 @@ class CORE50DataLoader(object):
         root: str,
         original_image_size: tuple[int, int],
         input_image_size: tuple[int, int],
+        resize_procedure: str = "",
         channels: int = 3,
         scenario: str = "ni",
         load_entire_batch: bool = False,
@@ -22,6 +23,8 @@ class CORE50DataLoader(object):
     ):
         self.root = os.path.abspath(root)
         self.original_image_size = original_image_size
+        self.input_image_size = input_image_size
+        self.resize_procedure = resize_procedure
         self.channels = channels
         self.scenario = scenario
         self.load_batch = load_entire_batch
@@ -100,6 +103,27 @@ class CORE50DataLoader(object):
             self.idx += 1
 
         x = self.get_batch_from_paths(img_paths).astype(np.uint8)
+
+        if self.resize_procedure == "border":
+            new_x = np.full(
+                (
+                    x.shape[0],
+                    self.input_image_size[0],
+                    self.input_image_size[1],
+                    x.shape[-1],
+                ),
+                fill_value=128,
+            )
+
+            border_size_0 = int(
+                (self.input_image_size[0] - self.original_image_size[0]) / 2
+            )
+            border_size_1 = int(
+                (self.input_image_size[1] - self.original_image_size[1]) / 2
+            )
+
+            new_x[:, border_size_0:-border_size_0, border_size_1:-border_size_1, :] = x
+            x = new_x
 
         return x, y
 
