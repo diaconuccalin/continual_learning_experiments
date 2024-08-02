@@ -1,28 +1,32 @@
-import numpy as np
 from matplotlib import pyplot as plt
 
-from core50.dataset import CORE50
+from core50.CORE50DataLoader import CORE50DataLoader
 
 
 def dataset_demo():
     # Generate dataset object
-    dataset = CORE50(
-        root="core50/data/core50_128x128",
-        preload=False,
+    dataset = CORE50DataLoader(
+        root="core50/data",
+        original_image_size=(128, 128),
+        input_image_size=(128, 128),
+        channels=3,
         scenario="ni",
-        cumul=False,
-        demo=True
+        load_entire_batch=False,
+        start_batch=1,
+        start_run=4,
+        start_idx=400,
     )
 
     # Extract sample
-    [x, ], y, _ = dataset.__next__()
+    x, y = dataset.__next__()
 
-    # Display image
-    plt.imshow(x.astype(np.uint8), interpolation='nearest')
-    plt.show()
+    for idx in range(x.shape[0]):
+        # Display image
+        plt.imshow(x[idx], interpolation="nearest")
+        plt.show()
 
-    # Print label
-    print("Showing image of class", dataset.classnames[int(y)])
+        # Print label
+        print("Showing image of class", dataset.class_names[int(y[idx])])
 
     return None
 
