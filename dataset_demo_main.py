@@ -1,12 +1,12 @@
 from matplotlib import pyplot as plt
 
-from core50.CORE50DataLoader import CORE50DataLoader
+from datasets.core50.CORE50DataLoader import CORE50DataLoader
 
 
 def dataset_demo():
     # Generate dataset object
     dataset = CORE50DataLoader(
-        root="core50/data",
+        root="datasets/core50/data",
         original_image_size=(350, 350),
         input_image_size=(384, 384),
         resize_procedure="border",

@@ -13,19 +13,19 @@ class MultiHeadSelfAttention(nn.Module):
         self.att_dim = att_dim
         self.head_dim = att_dim // n_heads
 
-        self.proj_in = nn.Linear(dim, 3 * att_dim, bias=False)
+        self.proj_q = nn.Linear(dim, att_dim, bias=True)
+        self.proj_k = nn.Linear(dim, att_dim, bias=True)
+        self.proj_v = nn.Linear(dim, att_dim, bias=True)
+
         self.scaling = q_rsqrt(self.head_dim)
         self.softmax = SoftmaxFastExp
         self.proj_out = nn.Linear(att_dim, dim, bias=False)
 
     def forward(self, x, tgt_len):
         # OP 1
-        qkv = self.proj_in(x)
-
-        # OP 2
-        q = qkv[..., : int(qkv.shape[-1] / 3)]
-        k = qkv[..., int(qkv.shape[-1] / 3) : 2 * int(qkv.shape[-1] / 3)]
-        v = qkv[..., 2 * int(qkv.shape[-1] / 3) :]
+        q = self.proj_q(x)
+        k = self.proj_k(x)
+        v = self.proj_v(x)
 
         q = q.contiguous().view(tgt_len, self.n_heads, self.head_dim).transpose(0, 1)
         k = k.contiguous().view(tgt_len, self.n_heads, self.head_dim).transpose(0, 1)

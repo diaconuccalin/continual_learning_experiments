@@ -10,7 +10,7 @@ class TransformerBlock(nn.Module):
         self.tgt_len = tgt_len
 
         self.norm1 = nn.LayerNorm(dim, eps=1e-6)
-        self.attention = MultiHeadSelfAttention(dim=dim, n_heads=num_heads, att_dim=dim)
+        self.attn = MultiHeadSelfAttention(dim=dim, n_heads=num_heads, att_dim=dim)
 
         self.proj = nn.Linear(dim, dim)
         self.drop = nn.Dropout(dropout)
@@ -19,7 +19,7 @@ class TransformerBlock(nn.Module):
 
     def forward(self, x):
         h = self.norm1(x)
-        h = self.attention(h, self.tgt_len)
+        h = self.attn(h, self.tgt_len)
         h = self.proj(h)
         h = self.drop(h)
 

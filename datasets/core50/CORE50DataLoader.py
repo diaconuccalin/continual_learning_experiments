@@ -4,7 +4,7 @@ import pickle
 import numpy as np
 from PIL import Image
 
-from core50 import constants
+from datasets.core50 import constants
 
 
 class CORE50DataLoader(object):
