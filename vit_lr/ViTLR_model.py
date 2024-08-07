@@ -8,6 +8,7 @@ from vit_lr.Transformer import Transformer
 class ViTLR(nn.Module):
     def __init__(
         self,
+        device,
         input_size: tuple[int, int] = (128, 128),
         in_channels: int = 3,
         hidden_dimension: int = 768,
@@ -52,6 +53,7 @@ class ViTLR(nn.Module):
             tgt_len=self.seq_len,
             ff_dim=ff_dim,
             dropout=dropout_rate,
+            device=device,
         )
 
         self.norm = nn.LayerNorm(hidden_dimension, eps=1e-6)

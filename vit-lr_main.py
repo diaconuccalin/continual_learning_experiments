@@ -1,14 +1,14 @@
 import matplotlib.pyplot as plt
-import numpy as np
 import torch
 
 from datasets.core50.CORE50DataLoader import CORE50DataLoader
 from datasets.imagenet.imagenet_1k_class_names import imagenet_classes
 from vit_lr.ResizeProcedure import ResizeProcedure
 from vit_lr.ViTLR_model import ViTLR
+from vit_lr.utils import vit_lr_image_preprocessing
 
 
-def vit_lr_demo(start_batch=0, start_run=0, start_idx=0):
+def vit_lr_demo(device, start_batch=0, start_run=0, start_idx=0):
     weight_path = "weigths/B_16_imagenet1k.pth"
     input_image_size = (384, 384)
     num_layers = 12
@@ -32,7 +32,7 @@ def vit_lr_demo(start_batch=0, start_run=0, start_idx=0):
     x, _ = dataset.__next__()
 
     # Load model
-    model = ViTLR(input_size=input_image_size, num_layers=num_layers)
+    model = ViTLR(device=device, input_size=input_image_size, num_layers=num_layers)
 
     # Load weights
     weights = torch.load(weight_path)
@@ -54,10 +54,15 @@ def vit_lr_demo(start_batch=0, start_run=0, start_idx=0):
     plt.axis("off")
     plt.show()
 
+    # Preprocess image
+    x = vit_lr_image_preprocessing(x)
+
+    # Set device to GPU
+    model.to(device)
+    x = x.to(device)
+
     # Perform inference
-    y_pred = model(torch.from_numpy(x.astype(np.float32) / 256).permute((0, 3, 1, 2)))[
-        0
-    ]
+    y_pred = model(x)[0]
 
     # Extract top k results
     sm = torch.nn.Softmax(dim=0)
@@ -75,4 +80,14 @@ def vit_lr_demo(start_batch=0, start_run=0, start_idx=0):
 
 
 if __name__ == "__main__":
-    vit_lr_demo(start_batch=1, start_run=4, start_idx=400)
+    torch.manual_seed(42)
+
+    if torch.cuda.is_available():
+        print("DEVICE SET TO GPU!\n")
+        device = torch.device("cuda")
+    else:
+        print("DEVICE SET TO CPU!\n")
+        device = torch.device("cpu")
+
+    vit_lr_demo(start_batch=1, start_run=4, start_idx=400, device=device)
+    vit_lr_naive_finetune(device=device)

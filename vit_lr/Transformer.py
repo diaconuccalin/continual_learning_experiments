@@ -4,7 +4,7 @@ from vit_lr.TransformerBlock import TransformerBlock
 
 
 class Transformer(nn.Module):
-    def __init__(self, num_layers, dim, num_heads, tgt_len, ff_dim, dropout):
+    def __init__(self, num_layers, dim, num_heads, tgt_len, ff_dim, dropout, device):
         super().__init__()
         self.blocks = nn.ModuleList(
             [
@@ -14,6 +14,7 @@ class Transformer(nn.Module):
                     tgt_len=tgt_len,
                     ff_dim=ff_dim,
                     dropout=dropout,
+                    device=device,
                 )
                 for _ in range(num_layers)
             ]

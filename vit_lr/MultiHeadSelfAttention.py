@@ -6,7 +6,7 @@ from vit_lr.utils import q_rsqrt
 
 
 class MultiHeadSelfAttention(nn.Module):
-    def __init__(self, dim, n_heads, att_dim):
+    def __init__(self, dim, n_heads, att_dim, device):
         super().__init__()
 
         assert (
@@ -21,7 +21,7 @@ class MultiHeadSelfAttention(nn.Module):
         self.proj_k = nn.Linear(dim, att_dim, bias=True)
         self.proj_v = nn.Linear(dim, att_dim, bias=True)
 
-        self.scaling = q_rsqrt(self.head_dim)
+        self.scaling = q_rsqrt(self.head_dim).to(device)
         self.softmax = SoftmaxFastExp
         self.proj_out = nn.Linear(att_dim, dim, bias=False)
 

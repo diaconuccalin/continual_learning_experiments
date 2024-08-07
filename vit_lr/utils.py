@@ -24,3 +24,19 @@ def fastexp_gist(x):
     x_copy = torch.where(x_copy > 2139095040, 2139095040, x_copy).type(torch.float32)
 
     return x_copy.type(torch.uint32).view(torch.float32)
+
+
+def vit_lr_image_preprocessing(x):
+    x = x.astype(np.float32)
+
+    x /= 255
+
+    x[..., 0] -= 0.485
+    x[..., 1] -= 0.456
+    x[..., 2] -= 0.406
+
+    x[..., 0] /= 0.229
+    x[..., 1] /= 0.224
+    x[..., 2] /= 0.225
+
+    return torch.from_numpy(x).permute((0, 3, 1, 2))
