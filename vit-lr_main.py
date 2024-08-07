@@ -4,6 +4,7 @@ import torch
 
 from datasets.core50.CORE50DataLoader import CORE50DataLoader
 from datasets.imagenet.imagenet_1k_class_names import imagenet_classes
+from vit_lr.ResizeProcedure import ResizeProcedure
 from vit_lr.ViTLR_model import ViTLR
 
 
@@ -18,7 +19,7 @@ def vit_lr_demo(start_batch=0, start_run=0, start_idx=0):
         root="datasets/core50/data",
         original_image_size=(350, 350),
         input_image_size=input_image_size,
-        resize_procedure="border",
+        resize_procedure=ResizeProcedure.BORDER,
         channels=3,
         scenario="ni",
         load_entire_batch=False,

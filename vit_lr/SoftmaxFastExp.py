@@ -1,14 +1,7 @@
 import torch
 from torch.autograd import Function
 
-
-def fastexp_gist(x):
-    x_copy = x.type(torch.float32)
-    x_copy = x_copy * 12102203.17133801 + 1064986823.010288
-    x_copy = torch.where(x_copy < 8388608, 0, x_copy).type(torch.float32)
-    x_copy = torch.where(x_copy > 2139095040, 2139095040, x_copy).type(torch.float32)
-
-    return x_copy.type(torch.uint32).view(torch.float32)
+from vit_lr.utils import fastexp_gist
 
 
 class SoftmaxFastExp(Function):

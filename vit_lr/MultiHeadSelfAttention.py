@@ -9,6 +9,10 @@ class MultiHeadSelfAttention(nn.Module):
     def __init__(self, dim, n_heads, att_dim):
         super().__init__()
 
+        assert (
+            att_dim % n_heads == 0
+        ), "Attention dimension not compatible with the given number of heads."
+
         self.n_heads = n_heads
         self.att_dim = att_dim
         self.head_dim = att_dim // n_heads
@@ -33,7 +37,6 @@ class MultiHeadSelfAttention(nn.Module):
 
         # OP 3
         scores = torch.bmm(q, k.transpose(1, 2))
-
         assert list(scores.size()) == [self.n_heads, tgt_len, tgt_len]
 
         # OP 4

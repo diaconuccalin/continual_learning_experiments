@@ -19,6 +19,16 @@ class ViTLR(nn.Module):
         num_classes: int = 1000,
     ):
         super().__init__()
+
+        # Check if the input image can be split into an exact number of patches of given size
+        assert (
+            input_size[0] % patch_size[0] == 0
+        ), "Incompatible first shape of input and patch sizes."
+        assert (
+            input_size[1] % patch_size[1] == 0
+        ), "Incompatible second shape of input and patch sizes."
+
+        # Generate required layers
         self.seq_len = int(
             (input_size[0] / patch_size[0]) * (input_size[1] / patch_size[1]) + 1
         )
@@ -53,7 +63,7 @@ class ViTLR(nn.Module):
         # b, c, h, w
         x = self.patch_embedding(x)
 
-        # b, dim, nph, npw (number of patches h/w)
+        # b, dim, nph, npw (number of patches - height and width)
         x = x.flatten(2).transpose(1, 2)
 
         # b, nph * npw, dim
