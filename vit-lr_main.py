@@ -9,7 +9,7 @@ from vit_lr.utils import vit_lr_image_preprocessing
 
 
 def vit_lr_demo(device, start_batch=0, start_run=0, start_idx=0):
-    weight_path = "weigths/B_16_imagenet1k.pth"
+    weight_path = "weights/B_16_imagenet1k.pth"
     input_image_size = (384, 384)
     num_layers = 12
     k = 10
@@ -88,7 +88,7 @@ def vit_lr_naive_finetune(
     start_run=0,
     start_idx=0,
 ):
-    weight_path = "weigths/B_16_imagenet1k.pth"
+    weight_path = "weights/B_16_imagenet1k.pth"
     input_image_size = (384, 384)
     num_layers = 12
 
