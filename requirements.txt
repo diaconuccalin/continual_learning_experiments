@@ -225,7 +225,6 @@ python-slugify==8.0.4
 pytorch-lightning==2.1.2
 pytz==2024.1
 PyYAML==5.4.1
-pyzed @ file:///tmp/selfgz683/pyzed-4.0-cp310-cp310-linux_x86_64.whl
 pyzmq==26.0.3
 qtconsole==5.5.2
 QtPy==2.4.1
