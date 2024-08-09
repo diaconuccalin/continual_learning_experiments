@@ -1,8 +1,8 @@
-new2old_names = {"ni": "ni", "multi-task-nc": "nc", "nic": "nicv2_391"}
+NEW_TO_OLD_NAMES = {"ni": "ni", "multi-task-nc": "nc", "nic": "nicv2_391"}
 
-nbatch = {"ni": 8, "nc": 9, "nicv2_391": 391}
+N_BATCH = {"ni": 8, "nc": 9, "nicv2_391": 391}
 
-classnames = [
+CORE50_CLASS_NAMES = [
     "adapter1",
     "adapter2",
     "adapter3",
@@ -54,3 +54,8 @@ classnames = [
     "remote_control4",
     "remote_control5",
 ]
+
+CORE50_ROOT_PATH = "datasets/core50/data"
+
+NI_TRAINING_BATCHES = list(range(9))
+NI_TESTING_BATCHES = [9]

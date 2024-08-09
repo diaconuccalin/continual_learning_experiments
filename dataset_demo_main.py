@@ -1,15 +1,17 @@
 from matplotlib import pyplot as plt
 
 from datasets.core50.CORE50DataLoader import CORE50DataLoader
+from datasets.core50.constants import CORE50_ROOT_PATH
+from vit_lr.ResizeProcedure import ResizeProcedure
 
 
 def dataset_demo():
     # Generate dataset object
     dataset = CORE50DataLoader(
-        root="datasets/core50/data",
+        root=CORE50_ROOT_PATH,
         original_image_size=(350, 350),
         input_image_size=(384, 384),
-        resize_procedure="border",
+        resize_procedure=ResizeProcedure.BORDER,
         channels=3,
         scenario="ni",
         load_entire_batch=False,

@@ -26,7 +26,8 @@ ViT weights, pretrained on Imagenet 1k, obtained from here: [B_16](https://githu
 ~~~
 .
 ├── weights
-│   ├── B_16_imagenet1k.pth
-│   ├── B_32_imagenet1k.pth
+│   ├── pretrained_imagenet
+│   │   ├──B_16_imagenet1k.pth
+│   │   ├── B_32_imagenet1k.pth
 ...
 ~~~

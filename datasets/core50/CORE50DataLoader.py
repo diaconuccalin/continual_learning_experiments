@@ -2,10 +2,12 @@ import os.path
 import pickle
 
 import numpy as np
+import torch
+import torch.nn as nn
 from PIL import Image
 
 from datasets.core50 import constants
-from datasets.core50.constants import new2old_names
+from datasets.core50.constants import NEW_TO_OLD_NAMES
 from vit_lr.ResizeProcedure import ResizeProcedure
 
 
@@ -42,7 +44,7 @@ class CORE50DataLoader(object):
         assert channels in [1, 3], "Number of channels not allowed."
 
         # Check if proper scenario
-        assert scenario in new2old_names.keys(), "Provided scenario not allowed."
+        assert scenario in NEW_TO_OLD_NAMES.keys(), "Provided scenario not allowed."
 
         # Extract class variables
         self.root = os.path.abspath(root)
@@ -56,8 +58,8 @@ class CORE50DataLoader(object):
         self.run = start_run
         self.idx = start_idx
 
-        self.nbatch = constants.nbatch
-        self.class_names = constants.classnames
+        self.n_batch = constants.N_BATCH
+        self.class_names = constants.CORE50_CLASS_NAMES
 
         # Load necessary files
         print("Loading paths...")
@@ -82,7 +84,7 @@ class CORE50DataLoader(object):
         return self
 
     def __next__(self):
-        if self.batch == self.nbatch[self.scenario]:
+        if self.batch == self.n_batch[self.scenario]:
             raise StopIteration
 
         img_paths = list()
@@ -105,7 +107,7 @@ class CORE50DataLoader(object):
 
             # Load labels
             y = np.asarray(
-                self.labels[self.scenario][self.run][self.batch], dtype=np.uint8
+                self.labels[self.scenario][self.run][self.batch], dtype=np.int64
             )
             self.batch += 1
         else:
@@ -132,7 +134,7 @@ class CORE50DataLoader(object):
                 [
                     self.labels[self.scenario][self.run][self.batch][self.idx],
                 ],
-                dtype=np.uint8,
+                dtype=np.int64,
             )
             self.idx += 1
 
@@ -176,6 +178,9 @@ class CORE50DataLoader(object):
                 :,
             ] = x
             x = new_x
+
+        # Transform to one hot encoding
+        y = nn.functional.one_hot(torch.from_numpy(y), len(self.class_names))
 
         return x, y
 
