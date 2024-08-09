@@ -1,6 +1,7 @@
 import os
 
 import torch
+from tqdm import tqdm
 
 from datasets.core50.CORE50DataLoader import CORE50DataLoader
 from datasets.core50.constants import CORE50_ROOT_PATH, CORE50_CLASS_NAMES
@@ -24,7 +25,18 @@ def vit_lr_epoch(
 ):
     losses_list = list()
     batch_len = len(data_loader.lup[current_task][current_run][current_batch])
-    for i in range(batch_len):
+
+    # Setup progress bar
+    loss = 0.0
+    progress_bar = tqdm(
+        range(batch_len),
+        colour="green",
+        desc="Epoch " + str(current_epoch),
+        postfix={"loss": loss},
+    )
+
+    # Iterate through batch
+    for _ in progress_bar:
         # Get sample
         x_train, y_train = data_loader.__next__()
 
@@ -36,31 +48,22 @@ def vit_lr_epoch(
         y_pred = model(x_train)
 
         # Loss computation
-        losses = criterion(y_pred, y_train)
+        loss = criterion(y_pred, y_train)
 
         # Backprop
         optimizer.zero_grad()
-        losses.backward()
+        loss.backward()
 
         # Update model
         optimizer.step()
 
         # Store loss
-        losses_list.append(losses.item())
+        losses_list.append(loss.item())
 
-        if i % 250 == 0:
-            print(
-                "Epoch {epoch}/{total_epochs} [{idx}/{total_len}]\tLoss {loss}\t".format(
-                    epoch=current_epoch,
-                    total_epochs=total_epochs,
-                    idx=i,
-                    total_len=len(
-                        data_loader.lup[current_task][current_run][current_batch]
-                    ),
-                    loss=losses,
-                )
-            )
+        # Update progress bar
+        progress_bar.set_postfix(loss=loss.item())
 
+    print("Saving model...")
     torch.save(
         {
             "epoch": current_epoch,
@@ -165,7 +168,7 @@ def vit_lr_training_pipeline(
     criterion = torch.nn.CrossEntropyLoss()
 
     # Iterate through batches and epochs
-    print("Starting the training loop...")
+    print("Starting the training loop...\n")
     current_epoch = 0
     for current_batch in batches:
         for e in range(epochs_per_batch):
