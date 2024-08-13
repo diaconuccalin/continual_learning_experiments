@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from vit_lr.TransformerBlock import TransformerBlock
+from models.vit_lr.TransformerBlock import TransformerBlock
 
 
 class Transformer(nn.Module):

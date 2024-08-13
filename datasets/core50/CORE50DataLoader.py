@@ -8,7 +8,8 @@ from PIL import Image
 
 from datasets.core50 import constants
 from datasets.core50.constants import NEW_TO_OLD_NAMES
-from vit_lr.ResizeProcedure import ResizeProcedure
+from models.vit_lr.ResizeProcedure import ResizeProcedure
+from models.vit_lr.utils import bordering_resize
 
 
 class CORE50DataLoader(object):
@@ -144,40 +145,7 @@ class CORE50DataLoader(object):
         # Resize image if needed
         # Case 1: larger target image, resize by bordering (equal neutral gray border on either side)
         if self.resize_procedure == ResizeProcedure.BORDER:
-            # Prepare new image
-            new_x = np.full(
-                (
-                    x.shape[0],
-                    self.input_image_size[0],
-                    self.input_image_size[1],
-                    x.shape[-1],
-                ),
-                fill_value=128,
-            )
-
-            # Compute horizontal and vertical border dimension
-            border_size_0 = int(
-                (self.input_image_size[0] - self.original_image_size[0]) / 2
-            )
-            border_size_1 = int(
-                (self.input_image_size[1] - self.original_image_size[1]) / 2
-            )
-
-            border_size_0_remaining = (
-                self.input_image_size[0] - self.original_image_size[0] - border_size_0
-            )
-            border_size_1_remaining = (
-                self.input_image_size[1] - self.original_image_size[1] - border_size_1
-            )
-
-            # Perform bordering
-            new_x[
-                :,
-                border_size_0:-border_size_0_remaining,
-                border_size_1:-border_size_1_remaining,
-                :,
-            ] = x
-            x = new_x
+            bordering_resize(x, self.input_image_size, self.original_image_size)
 
         # Transform to one hot encoding
         y = nn.functional.one_hot(torch.from_numpy(y), len(self.class_names))

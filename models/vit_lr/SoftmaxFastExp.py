@@ -1,7 +1,7 @@
 import torch
 from torch.autograd import Function
 
-from vit_lr.utils import fastexp_gist
+from models.vit_lr.utils import fastexp_gist
 
 
 class SoftmaxFastExp(Function):

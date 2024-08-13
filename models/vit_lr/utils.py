@@ -40,3 +40,36 @@ def vit_lr_image_preprocessing(x):
     x[..., 2] /= 0.225
 
     return torch.from_numpy(x).permute((0, 3, 1, 2))
+
+
+def bordering_resize(x, original_image_size, input_image_size):
+    # Prepare new image
+    new_x = np.full(
+        (
+            x.shape[0],
+            input_image_size[0],
+            input_image_size[1],
+            x.shape[-1],
+        ),
+        fill_value=128,
+    )
+
+    # Compute horizontal and vertical border dimension
+    border_size_0 = int((input_image_size[0] - original_image_size[0]) / 2)
+    border_size_1 = int((input_image_size[1] - original_image_size[1]) / 2)
+
+    border_size_0_remaining = (
+        input_image_size[0] - original_image_size[0] - border_size_0
+    )
+    border_size_1_remaining = (
+        input_image_size[1] - original_image_size[1] - border_size_1
+    )
+
+    # Perform bordering
+    new_x[
+        :,
+        border_size_0:-border_size_0_remaining,
+        border_size_1:-border_size_1_remaining,
+        :,
+    ] = x
+    return new_x

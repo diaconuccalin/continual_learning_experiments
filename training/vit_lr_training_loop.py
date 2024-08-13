@@ -5,9 +5,9 @@ from tqdm import tqdm
 
 from datasets.core50.CORE50DataLoader import CORE50DataLoader
 from datasets.core50.constants import CORE50_ROOT_PATH, CORE50_CLASS_NAMES
-from vit_lr.ResizeProcedure import ResizeProcedure
-from vit_lr.ViTLR_model import ViTLR
-from vit_lr.utils import vit_lr_image_preprocessing
+from models.vit_lr.ResizeProcedure import ResizeProcedure
+from models.vit_lr.ViTLR_model import ViTLR
+from models.vit_lr.utils import vit_lr_image_preprocessing
 
 
 def vit_lr_epoch(
@@ -29,7 +29,7 @@ def vit_lr_epoch(
     # Setup progress bar
     loss = 0.0
     progress_bar = tqdm(
-        range(batch_len),
+        range(10),
         colour="green",
         desc="Epoch " + str(current_epoch),
         postfix={"loss": loss},
@@ -63,7 +63,7 @@ def vit_lr_epoch(
         # Update progress bar
         progress_bar.set_postfix(loss=loss.item())
 
-    print("Saving model...")
+    print("\nSaving model...\n")
     torch.save(
         {
             "epoch": current_epoch,
@@ -130,6 +130,9 @@ def vit_lr_training_pipeline(
     # Load weights
     print("Loading pretrained weights...")
     weights = torch.load(pretrained_weights_path, weights_only=False)
+
+    if "model_state_dict" in weights.keys():
+        weights = weights["model_state_dict"]
 
     # Required for fully connected layer
     # Original weights for ImageNet 1k => 1000 classes => incompatible fc layer dimension

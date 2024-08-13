@@ -1,7 +1,7 @@
 import torch.nn as nn
 
-from vit_lr.MultiHeadSelfAttention import MultiHeadSelfAttention
-from vit_lr.PositionWiseFeedForward import PositionWiseFeedForward
+from models.vit_lr.MultiHeadSelfAttention import MultiHeadSelfAttention
+from models.vit_lr.PositionWiseFeedForward import PositionWiseFeedForward
 
 
 class TransformerBlock(nn.Module):

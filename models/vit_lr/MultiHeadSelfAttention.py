@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 
-from vit_lr.SoftmaxFastExp import SoftmaxFastExp
-from vit_lr.utils import q_rsqrt
+from models.vit_lr.SoftmaxFastExp import SoftmaxFastExp
+from models.vit_lr.utils import q_rsqrt
 
 
 class MultiHeadSelfAttention(nn.Module):

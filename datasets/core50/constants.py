@@ -57,5 +57,5 @@ CORE50_CLASS_NAMES = [
 
 CORE50_ROOT_PATH = "datasets/core50/data"
 
-NI_TRAINING_BATCHES = list(range(9))
-NI_TESTING_BATCHES = [9]
+NI_TRAINING_BATCHES = list(range(8))
+NI_TESTING_BATCHES = [8]
