@@ -29,7 +29,7 @@ def vit_lr_epoch(
     # Setup progress bar
     loss = 0.0
     progress_bar = tqdm(
-        range(10),
+        range(batch_len),
         colour="green",
         desc="Epoch " + str(current_epoch),
         postfix={"loss": loss},
@@ -129,7 +129,9 @@ def vit_lr_training_pipeline(
 
     # Load weights
     print("Loading pretrained weights...")
-    weights = torch.load(pretrained_weights_path, weights_only=False)
+    weights = torch.load(
+        pretrained_weights_path, weights_only=False, map_location=device
+    )
 
     if "model_state_dict" in weights.keys():
         weights = weights["model_state_dict"]
@@ -154,7 +156,7 @@ def vit_lr_training_pipeline(
             model.transformer.blocks[i].attn.proj_out.bias.requires_grad = False
     model.load_state_dict(weights)
 
-    # Move to GPU
+    # Move model to GPU
     model.to(device)
 
     # Prepare for training

@@ -25,6 +25,7 @@ class CORE50DataLoader(object):
         start_batch: int = 0,
         start_run: int = 0,
         start_idx: int = 0,
+        eval_mode: bool = False,
     ):
         # Check that a resize procedure is provided when needed
         if original_image_size != input_image_size:
@@ -58,6 +59,7 @@ class CORE50DataLoader(object):
         self.batch = start_batch
         self.run = start_run
         self.idx = start_idx
+        self.eval_mode = eval_mode
 
         self.n_batch = constants.N_BATCH
         self.class_names = constants.CORE50_CLASS_NAMES
@@ -85,7 +87,7 @@ class CORE50DataLoader(object):
         return self
 
     def __next__(self):
-        if self.batch == self.n_batch[self.scenario]:
+        if self.batch == self.n_batch[self.scenario] and not self.eval_mode:
             raise StopIteration
 
         img_paths = list()
@@ -145,10 +147,17 @@ class CORE50DataLoader(object):
         # Resize image if needed
         # Case 1: larger target image, resize by bordering (equal neutral gray border on either side)
         if self.resize_procedure == ResizeProcedure.BORDER:
-            bordering_resize(x, self.input_image_size, self.original_image_size)
+            x = bordering_resize(
+                x,
+                input_image_size=self.input_image_size,
+                original_image_size=self.original_image_size,
+            )
 
         # Transform to one hot encoding
-        y = nn.functional.one_hot(torch.from_numpy(y), len(self.class_names))
+        if not self.eval_mode:
+            y = nn.functional.one_hot(torch.from_numpy(y), len(self.class_names))
+        else:
+            y = torch.from_numpy(y)
 
         return x, y
 

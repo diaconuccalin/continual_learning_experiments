@@ -1,8 +1,11 @@
 import numpy as np
 import torch
 from PIL import Image
+from tqdm import tqdm
 
-from datasets.core50.constants import CORE50_CLASS_NAMES
+from datasets.core50.CORE50DataLoader import CORE50DataLoader
+from datasets.core50.constants import CORE50_CLASS_NAMES, CORE50_ROOT_PATH
+from models.vit_lr.ResizeProcedure import ResizeProcedure
 from models.vit_lr.ViTLR_model import ViTLR
 from models.vit_lr.utils import bordering_resize, vit_lr_image_preprocessing
 
@@ -71,3 +74,84 @@ def vit_lr_single_evaluation(
     sm = torch.nn.Softmax(dim=1)
 
     return sm(pred)
+
+
+def vit_lr_evaluation_pipeline(
+    input_image_size, current_task, current_run, num_layers, weights_path, device
+):
+    # Generate data loader
+    data_loader = CORE50DataLoader(
+        root=CORE50_ROOT_PATH,
+        original_image_size=(350, 350),
+        input_image_size=input_image_size,
+        resize_procedure=ResizeProcedure.BORDER,
+        channels=3,
+        scenario=current_task,
+        load_entire_batch=False,
+        start_run=current_run,
+        start_batch=8,
+        eval_mode=True,
+        start_idx=0,
+    )
+
+    # Prepare model
+    model = ViTLR(
+        device=device,
+        num_layers=num_layers,
+        input_size=input_image_size,
+        num_classes=len(CORE50_CLASS_NAMES),
+    )
+
+    # Load weights
+    print("Loading pretrained weights...")
+    weights = torch.load(weights_path, weights_only=False, map_location=device)
+
+    if "model_state_dict" in weights.keys():
+        weights = weights["model_state_dict"]
+
+    # Required for fully connected layer
+    # Original weights for ImageNet 1k => 1000 classes => incompatible fc layer dimension
+    weights["fc.weight"] = model.fc.weight.data
+    weights["fc.bias"] = model.fc.bias.data
+
+    # Required because the proj_out layer is not present in the default ViT
+    for i in range(num_layers):
+        # torch.eye is an identity matrix
+        weights["transformer.blocks." + str(i) + ".attn.proj_out.weight"] = torch.eye(
+            n=model.state_dict()[
+                "transformer.blocks." + str(i) + ".attn.proj_out.weight"
+            ].shape[0]
+        )
+
+        # Mark proj_out as frozen
+        model.transformer.blocks[i].attn.proj_out.weight.requires_grad = False
+        if model.transformer.blocks[i].attn.proj_out.bias is not None:
+            model.transformer.blocks[i].attn.proj_out.bias.requires_grad = False
+    model.load_state_dict(weights)
+
+    # Move model to GPU
+    model.to(device)
+
+    # Prepare model for evaluation
+    model.eval()
+
+    # Compute accuracy
+    n_correct_preds = 0
+    total_samples = len(data_loader.lup[current_task][current_run][8]) - 1
+
+    # Prepare progress bar
+    progress_bar = tqdm(range(total_samples), colour="yellow", desc="Eval")
+
+    # Iterate through samples
+    for _ in progress_bar:
+        # Prepare sample
+        x_train, y_train = data_loader.__next__()
+        x_train = vit_lr_image_preprocessing(x_train).to(device)
+
+        y_train = y_train.item()
+        y_pred = torch.argmax(model(x_train)).item()
+
+        if y_train == y_pred:
+            n_correct_preds += 1
+
+    return n_correct_preds / total_samples
