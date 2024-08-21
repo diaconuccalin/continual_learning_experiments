@@ -82,3 +82,10 @@ class ViTLR(nn.Module):
         x = self.fc(x)
 
         return x
+
+    def set_backbone_trainable(self, trainable: bool):
+        self.patch_embedding.requires_grad_(trainable)
+        self.class_token.requires_grad_(trainable)
+        self.positional_embedding.requires_grad_(trainable)
+        self.transformer.requires_grad_(trainable)
+        self.norm.requires_grad_(trainable)

@@ -1,5 +1,6 @@
 import os.path
 import pickle
+import random
 
 import numpy as np
 import torch
@@ -26,6 +27,7 @@ class CORE50DataLoader(object):
         start_run: int = 0,
         start_idx: int = 0,
         eval_mode: bool = False,
+        randomize_data_order: bool = False,
     ):
         # Check that a resize procedure is provided when needed
         if original_image_size != input_image_size:
@@ -60,6 +62,7 @@ class CORE50DataLoader(object):
         self.run = start_run
         self.idx = start_idx
         self.eval_mode = eval_mode
+        self.randomize_data_order = randomize_data_order
 
         self.n_batch = constants.N_BATCH
         self.class_names = constants.CORE50_CLASS_NAMES
@@ -80,8 +83,9 @@ class CORE50DataLoader(object):
             self.labels = pickle.load(f)
         print("Labels loaded")
 
-        if not self.load_batch:
-            self.idx_list = self.lup[self.scenario][self.run][self.batch]
+        # Randomize data order if needed
+        print("Randomizing data order...")
+        self._randomize_data_order()
 
     def __iter__(self):
         return self
@@ -91,9 +95,12 @@ class CORE50DataLoader(object):
             raise StopIteration
 
         img_paths = list()
+        # Load entire batch
         if self.load_batch:
             # Load ids of batch
-            self.idx_list = self.lup[self.scenario][self.run][self.batch]
+            self.idx_list = [
+                self.lup[self.scenario][self.run][self.batch][i] for i in self.idx_order
+            ]
 
             # Load image paths
             for current_idx in self.idx_list:
@@ -110,14 +117,22 @@ class CORE50DataLoader(object):
 
             # Load labels
             y = np.asarray(
-                self.labels[self.scenario][self.run][self.batch], dtype=np.int64
+                [
+                    self.labels[self.scenario][self.run][self.batch][i]
+                    for i in self.idx_order
+                ],
+                dtype=np.int64,
             )
+
+            # Increment batch counter
             self.batch += 1
+            self._randomize_data_order()
+        # Load individual elements
         else:
             # If reached end of current batch, go to next one
-            if self.idx == len(self.idx_list) - 1:
+            if self.idx == len(self.idx_order):
                 self.batch += 1
-                self.idx_list = self.lup[self.scenario][self.run][self.batch]
+                self._randomize_data_order()
                 self.idx = 0
 
             # Load image path
@@ -128,14 +143,16 @@ class CORE50DataLoader(object):
                     + str(self.original_image_size[0])
                     + "x"
                     + str(self.original_image_size[1]),
-                    self.paths[self.idx_list[self.idx]],
+                    self.paths[self.idx_order[self.idx]],
                 )
             )
 
             # Load label
             y = np.asarray(
                 [
-                    self.labels[self.scenario][self.run][self.batch][self.idx],
+                    self.labels[self.scenario][self.run][self.batch][
+                        self.idx_order[self.idx]
+                    ]
                 ],
                 dtype=np.int64,
             )
@@ -183,3 +200,9 @@ class CORE50DataLoader(object):
                 x[i] = np.array(Image.open(path))
 
         return x
+
+    # Private function that randomizes data order
+    def _randomize_data_order(self):
+        self.idx_order = range(len(self.lup[self.scenario][self.run][self.batch]))
+        if self.randomize_data_order:
+            self.idx_order = random.sample(self.idx_order, len(self.idx_order))

@@ -88,6 +88,8 @@ def vit_lr_training_pipeline(
     device,
     pretrained_weights_path,
     session_name,
+    trainable_backbone,
+    randomize_data_order,
 ):
     # Generate data loader
     print("Creating data loader...")
@@ -100,6 +102,7 @@ def vit_lr_training_pipeline(
         scenario=current_task,
         load_entire_batch=False,
         start_run=current_run,
+        randomize_data_order=randomize_data_order,
     )
 
     # Prepare model save path
@@ -156,6 +159,10 @@ def vit_lr_training_pipeline(
             model.transformer.blocks[i].attn.proj_out.bias.requires_grad = False
     model.load_state_dict(weights)
 
+    # Set whether backbone is trainable
+    print("Marking backbone as trainable or not...")
+    model.set_backbone_trainable(trainable_backbone)
+
     # Move model to GPU
     model.to(device)
 
@@ -170,7 +177,7 @@ def vit_lr_training_pipeline(
         momentum=momentum,
         weight_decay=l2,
     )
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = torch.nn.BCEWithLogitsLoss()
 
     # Iterate through batches and epochs
     print("Starting the training loop...\n")

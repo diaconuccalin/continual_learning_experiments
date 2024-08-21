@@ -47,7 +47,7 @@ if __name__ == "__main__":
         vit_lr_training_pipeline(
             batches=NI_TRAINING_BATCHES,
             epochs_per_batch=1,
-            initial_lr=0.1,
+            initial_lr=0.01,
             momentum=0.9,
             l2=0.0005,
             input_image_size=(384, 384),
@@ -57,6 +57,8 @@ if __name__ == "__main__":
             device=device,
             pretrained_weights_path="weights/pretrained_imagenet/B_16_imagenet1k.pth",
             session_name=session_name,
+            trainable_backbone=False,
+            randomize_data_order=True,
         )
     elif pipeline == "vit_lr_core50_evaluation":
         accuracy = vit_lr_evaluation_pipeline(
