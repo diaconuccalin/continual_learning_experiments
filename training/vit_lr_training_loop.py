@@ -152,16 +152,17 @@ def vit_lr_training_pipeline(
                 "transformer.blocks." + str(i) + ".attn.proj_out.weight"
             ].shape[0]
         )
-
-        # Mark proj_out as frozen
-        model.transformer.blocks[i].attn.proj_out.weight.requires_grad = False
-        if model.transformer.blocks[i].attn.proj_out.bias is not None:
-            model.transformer.blocks[i].attn.proj_out.bias.requires_grad = False
     model.load_state_dict(weights)
 
     # Set whether backbone is trainable
     print("Marking backbone as trainable or not...")
     model.set_backbone_trainable(trainable_backbone)
+
+    # Mark proj_out as frozen
+    for i in range(num_layers):
+        model.transformer.blocks[i].attn.proj_out.weight.requires_grad = False
+        if model.transformer.blocks[i].attn.proj_out.bias is not None:
+            model.transformer.blocks[i].attn.proj_out.bias.requires_grad = False
 
     # Move model to GPU
     model.to(device)
