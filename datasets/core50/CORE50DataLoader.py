@@ -85,7 +85,8 @@ class CORE50DataLoader(object):
 
         # Randomize data order if needed
         print("Randomizing data order...")
-        self._randomize_data_order()
+        self.idx_order = None
+        self.do_randomization()
 
     def __iter__(self):
         return self
@@ -126,13 +127,13 @@ class CORE50DataLoader(object):
 
             # Increment batch counter
             self.batch += 1
-            self._randomize_data_order()
+            self.do_randomization()
         # Load individual elements
         else:
             # If reached end of current batch, go to next one
             if self.idx == len(self.idx_order):
                 self.batch += 1
-                self._randomize_data_order()
+                self.do_randomization()
                 self.idx = 0
 
             # Load image path
@@ -201,8 +202,8 @@ class CORE50DataLoader(object):
 
         return x
 
-    # Private function that randomizes data order
-    def _randomize_data_order(self):
+    # Function that randomizes data order
+    def do_randomization(self):
         self.idx_order = range(len(self.lup[self.scenario][self.run][self.batch]))
         if self.randomize_data_order:
             self.idx_order = random.sample(self.idx_order, len(self.idx_order))
