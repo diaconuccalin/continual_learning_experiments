@@ -57,7 +57,7 @@ if __name__ == "__main__":
             device=device,
             pretrained_weights_path="weights/pretrained_imagenet/B_16_imagenet1k.pth",
             session_name=session_name,
-            trainable_backbone=False,
+            trainable_backbone=True,
             randomize_data_order=True,
         )
     elif pipeline == "vit_lr_core50_evaluation":

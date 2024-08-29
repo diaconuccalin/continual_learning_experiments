@@ -109,24 +109,6 @@ def vit_lr_evaluation_pipeline(
     if "model_state_dict" in weights.keys():
         weights = weights["model_state_dict"]
 
-    # Required for fully connected layer
-    # Original weights for ImageNet 1k => 1000 classes => incompatible fc layer dimension
-    weights["fc.weight"] = model.fc.weight.data
-    weights["fc.bias"] = model.fc.bias.data
-
-    # Required because the proj_out layer is not present in the default ViT
-    for i in range(num_layers):
-        # torch.eye is an identity matrix
-        weights["transformer.blocks." + str(i) + ".attn.proj_out.weight"] = torch.eye(
-            n=model.state_dict()[
-                "transformer.blocks." + str(i) + ".attn.proj_out.weight"
-            ].shape[0]
-        )
-
-        # Mark proj_out as frozen
-        model.transformer.blocks[i].attn.proj_out.weight.requires_grad = False
-        if model.transformer.blocks[i].attn.proj_out.bias is not None:
-            model.transformer.blocks[i].attn.proj_out.bias.requires_grad = False
     model.load_state_dict(weights)
 
     # Move model to GPU
@@ -137,6 +119,7 @@ def vit_lr_evaluation_pipeline(
 
     # Compute accuracy
     n_correct_preds = 0
+    preds_so_far = 0
     total_samples = len(data_loader.lup[current_task][current_run][8]) - 1
 
     # Prepare progress bar
@@ -151,7 +134,12 @@ def vit_lr_evaluation_pipeline(
         y_train = y_train.item()
         y_pred = torch.argmax(model(x_train)).item()
 
+        preds_so_far += 1
         if y_train == y_pred:
             n_correct_preds += 1
 
-    return n_correct_preds / total_samples
+        progress_bar.set_postfix_str(
+            f"Accuracy: %0.3f" % (100 * n_correct_preds / preds_so_far) + "%"
+        )
+
+    return n_correct_preds / preds_so_far
