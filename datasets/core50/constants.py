@@ -55,6 +55,19 @@ CORE50_CLASS_NAMES = [
     "remote_control5",
 ]
 
+CORE50_SUPERCLASS_NAMES = [
+    "adapter",
+    "mobile_phone",
+    "scissors",
+    "light_bulb",
+    "can",
+    "glasses",
+    "ball",
+    "marker",
+    "cup",
+    "remote_control",
+]
+
 CORE50_ROOT_PATH = "datasets/core50/data"
 
 NI_TRAINING_BATCHES = list(range(8))

@@ -4,7 +4,11 @@ import torch
 from tqdm import tqdm
 
 from datasets.core50.CORE50DataLoader import CORE50DataLoader
-from datasets.core50.constants import CORE50_ROOT_PATH, CORE50_CLASS_NAMES
+from datasets.core50.constants import (
+    CORE50_ROOT_PATH,
+    CORE50_SUPERCLASS_NAMES,
+    CORE50_CLASS_NAMES,
+)
 from models.vit_lr.ResizeProcedure import ResizeProcedure
 from models.vit_lr.ViTLR_model import ViTLR
 from models.vit_lr.utils import vit_lr_image_preprocessing
@@ -90,7 +94,14 @@ def vit_lr_training_pipeline(
     session_name,
     trainable_backbone,
     randomize_data_order,
+    use_superclass,
 ):
+    # Compute number of classes
+    if use_superclass:
+        num_classes = len(CORE50_SUPERCLASS_NAMES)
+    else:
+        num_classes = len(CORE50_CLASS_NAMES)
+
     # Generate data loader
     print("Creating data loader...")
     data_loader = CORE50DataLoader(
@@ -103,6 +114,7 @@ def vit_lr_training_pipeline(
         load_entire_batch=False,
         start_run=current_run,
         randomize_data_order=randomize_data_order,
+        use_superclass=use_superclass,
     )
 
     # Prepare model save path
@@ -127,7 +139,7 @@ def vit_lr_training_pipeline(
         device=device,
         num_layers=num_layers,
         input_size=input_image_size,
-        num_classes=len(CORE50_CLASS_NAMES),
+        num_classes=num_classes,
     )
 
     # Load weights
@@ -140,7 +152,7 @@ def vit_lr_training_pipeline(
         weights = weights["model_state_dict"]
 
     # Required for fully connected layer
-    # Original weights for ImageNet 1k => 1000 classes => incompatible fc layer dimension
+    # Overwrite original weights for ImageNet 1k (1000 classes => incompatible fc layer dimension)
     weights["fc.weight"] = model.fc.weight.data
     weights["fc.bias"] = model.fc.bias.data
 

@@ -28,6 +28,10 @@ class CORE50DataLoader(object):
         start_idx: int = 0,
         eval_mode: bool = False,
         randomize_data_order: bool = False,
+        # If False, use the default 50 classes; if True, use the 10 superclasses,
+        # by mapping each 5 classes into the corresponding superclass
+        # (one superclass contains all the 5 different objects for each of the 10 types).
+        use_superclass: bool = False,
     ):
         # Check that a resize procedure is provided when needed
         if original_image_size != input_image_size:
@@ -63,9 +67,14 @@ class CORE50DataLoader(object):
         self.idx = start_idx
         self.eval_mode = eval_mode
         self.randomize_data_order = randomize_data_order
+        self.use_superclass = use_superclass
 
         self.n_batch = constants.N_BATCH
-        self.class_names = constants.CORE50_CLASS_NAMES
+
+        if use_superclass:
+            self.class_names = constants.CORE50_SUPERCLASS_NAMES
+        else:
+            self.class_names = constants.CORE50_CLASS_NAMES
 
         # Load necessary files
         print("Loading paths...")
@@ -125,6 +134,10 @@ class CORE50DataLoader(object):
                 dtype=np.int64,
             )
 
+            # Map to superclass if needed
+            if self.use_superclass:
+                y = np.array([int(y_i / 5) for y_i in y], dtype=np.int64)
+
             # Increment batch counter
             self.batch += 1
             self.do_randomization()
@@ -170,6 +183,10 @@ class CORE50DataLoader(object):
                 input_image_size=self.input_image_size,
                 original_image_size=self.original_image_size,
             )
+
+        # Map to superclass if needed
+        if self.use_superclass:
+            y = np.array([int(y_i / 5) for y_i in y], dtype=np.int64)
 
         # Transform to one hot encoding
         if not self.eval_mode:

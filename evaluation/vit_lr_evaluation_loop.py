@@ -1,10 +1,15 @@
 import numpy as np
 import torch
 from PIL import Image
+from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
 
 from datasets.core50.CORE50DataLoader import CORE50DataLoader
-from datasets.core50.constants import CORE50_CLASS_NAMES, CORE50_ROOT_PATH
+from datasets.core50.constants import (
+    CORE50_CLASS_NAMES,
+    CORE50_ROOT_PATH,
+    CORE50_SUPERCLASS_NAMES,
+)
 from models.vit_lr.ResizeProcedure import ResizeProcedure
 from models.vit_lr.ViTLR_model import ViTLR
 from models.vit_lr.utils import bordering_resize, vit_lr_image_preprocessing
@@ -18,8 +23,14 @@ def vit_lr_single_evaluation(
     original_image_size,
     input_image_size,
     device,
-    num_classes=len(CORE50_CLASS_NAMES),
+    use_superclass,
 ):
+    # Compute number of classes
+    if use_superclass:
+        num_classes = len(CORE50_SUPERCLASS_NAMES)
+    else:
+        num_classes = len(CORE50_CLASS_NAMES)
+
     # Create model object
     model = ViTLR(
         device=device,
@@ -77,8 +88,20 @@ def vit_lr_single_evaluation(
 
 
 def vit_lr_evaluation_pipeline(
-    input_image_size, current_task, current_run, num_layers, weights_path, device
+    input_image_size,
+    current_task,
+    current_run,
+    num_layers,
+    weights_path,
+    use_superclass,
+    device,
 ):
+    # Compute number of classes
+    if use_superclass:
+        num_classes = len(CORE50_SUPERCLASS_NAMES)
+    else:
+        num_classes = len(CORE50_CLASS_NAMES)
+
     # Generate data loader
     data_loader = CORE50DataLoader(
         root=CORE50_ROOT_PATH,
@@ -92,6 +115,7 @@ def vit_lr_evaluation_pipeline(
         start_batch=8,
         eval_mode=True,
         start_idx=0,
+        use_superclass=use_superclass,
     )
 
     # Prepare model
@@ -99,7 +123,7 @@ def vit_lr_evaluation_pipeline(
         device=device,
         num_layers=num_layers,
         input_size=input_image_size,
-        num_classes=len(CORE50_CLASS_NAMES),
+        num_classes=num_classes,
     )
 
     # Load weights
@@ -122,6 +146,10 @@ def vit_lr_evaluation_pipeline(
     preds_so_far = 0
     total_samples = len(data_loader.lup[current_task][current_run][8]) - 1
 
+    # Store for conf matrix
+    all_y_trains = list()
+    all_y_preds = list()
+
     # Prepare progress bar
     progress_bar = tqdm(range(total_samples), colour="yellow", desc="Eval")
 
@@ -134,6 +162,9 @@ def vit_lr_evaluation_pipeline(
         y_train = y_train.item()
         y_pred = torch.argmax(model(x_train)).item()
 
+        all_y_trains.append(y_train)
+        all_y_preds.append(y_pred)
+
         preds_so_far += 1
         if y_train == y_pred:
             n_correct_preds += 1
@@ -142,4 +173,4 @@ def vit_lr_evaluation_pipeline(
             f"Accuracy: %0.3f" % (100 * n_correct_preds / preds_so_far) + "%"
         )
 
-    return n_correct_preds / preds_so_far
+    return n_correct_preds / preds_so_far, confusion_matrix(all_y_trains, all_y_preds)
