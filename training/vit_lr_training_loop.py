@@ -111,7 +111,7 @@ def vit_lr_training_pipeline(
         resize_procedure=ResizeProcedure.BORDER,
         channels=3,
         scenario=current_task,
-        load_entire_batch=False,
+        mini_batch_size=64,
         start_run=current_run,
         randomize_data_order=randomize_data_order,
         use_superclass=use_superclass,
@@ -137,6 +137,7 @@ def vit_lr_training_pipeline(
     # Generate model object
     model = ViTLR(
         device=device,
+        mini_batch_size=64,
         num_layers=num_layers,
         input_size=input_image_size,
         num_classes=num_classes,

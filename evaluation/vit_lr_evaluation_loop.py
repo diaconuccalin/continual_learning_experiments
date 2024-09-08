@@ -17,6 +17,7 @@ from models.vit_lr.utils import bordering_resize, vit_lr_image_preprocessing
 
 def vit_lr_single_evaluation(
     num_layers,
+    mini_batch_size,
     input_size,
     weights_path,
     image_path,
@@ -34,6 +35,7 @@ def vit_lr_single_evaluation(
     # Create model object
     model = ViTLR(
         device=device,
+        mini_batch_size=mini_batch_size,
         num_layers=num_layers,
         input_size=input_size,
         num_classes=num_classes,
@@ -110,9 +112,9 @@ def vit_lr_evaluation_pipeline(
         resize_procedure=ResizeProcedure.BORDER,
         channels=3,
         scenario=current_task,
-        load_entire_batch=False,
+        mini_batch_size=64,
         start_run=current_run,
-        start_batch=8,
+        start_batch=0,
         eval_mode=True,
         start_idx=0,
         use_superclass=use_superclass,
@@ -121,6 +123,7 @@ def vit_lr_evaluation_pipeline(
     # Prepare model
     model = ViTLR(
         device=device,
+        mini_batch_size=64,
         num_layers=num_layers,
         input_size=input_image_size,
         num_classes=num_classes,

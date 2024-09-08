@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 
 from models.vit_lr.SoftmaxFastExp import SoftmaxFastExp
@@ -6,7 +5,7 @@ from models.vit_lr.utils import q_rsqrt
 
 
 class MultiHeadSelfAttention(nn.Module):
-    def __init__(self, dim, n_heads, att_dim, device):
+    def __init__(self, mini_batch_size, dim, n_heads, att_dim, device):
         super().__init__()
 
         assert (
@@ -16,6 +15,7 @@ class MultiHeadSelfAttention(nn.Module):
         self.n_heads = n_heads
         self.att_dim = att_dim
         self.head_dim = att_dim // n_heads
+        self.mini_batch_size = mini_batch_size
 
         self.proj_q = nn.Linear(dim, att_dim, bias=True)
         self.proj_k = nn.Linear(dim, att_dim, bias=True)
@@ -31,13 +31,30 @@ class MultiHeadSelfAttention(nn.Module):
         k = self.proj_k(x)
         v = self.proj_v(x)
 
-        q = q.contiguous().view(tgt_len, self.n_heads, self.head_dim).transpose(0, 1)
-        k = k.contiguous().view(tgt_len, self.n_heads, self.head_dim).transpose(0, 1)
-        v = v.contiguous().view(tgt_len, self.n_heads, self.head_dim).transpose(0, 1)
+        q = (
+            q.contiguous()
+            .view(self.mini_batch_size, tgt_len, self.n_heads, self.head_dim)
+            .transpose(1, 2)
+        )
+        k = (
+            k.contiguous()
+            .view(self.mini_batch_size, tgt_len, self.n_heads, self.head_dim)
+            .transpose(1, 2)
+        )
+        v = (
+            v.contiguous()
+            .view(self.mini_batch_size, tgt_len, self.n_heads, self.head_dim)
+            .transpose(1, 2)
+        )
 
         # OP 3
-        scores = torch.bmm(q, k.transpose(1, 2))
-        assert list(scores.size()) == [self.n_heads, tgt_len, tgt_len]
+        scores = q @ k.transpose(2, 3)
+        assert list(scores.size()) == [
+            self.mini_batch_size,
+            self.n_heads,
+            tgt_len,
+            tgt_len,
+        ]
 
         # OP 4
         scores = scores * self.scaling
@@ -46,10 +63,19 @@ class MultiHeadSelfAttention(nn.Module):
         scores = self.softmax(scores)
 
         # OP 6
-        scores = torch.bmm(scores, v)
-        assert list(scores.size()) == [self.n_heads, tgt_len, self.head_dim]
+        scores = scores @ v
+        assert list(scores.size()) == [
+            self.mini_batch_size,
+            self.n_heads,
+            tgt_len,
+            self.head_dim,
+        ]
 
-        scores = scores.transpose(0, 1).contiguous().view(tgt_len, self.att_dim)
+        scores = (
+            scores.transpose(1, 2)
+            .contiguous()
+            .view(self.mini_batch_size, tgt_len, self.att_dim)
+        )
 
         # OP 7
         h = self.proj_out(scores)

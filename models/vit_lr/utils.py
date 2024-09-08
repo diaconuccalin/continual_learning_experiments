@@ -43,6 +43,17 @@ def vit_lr_image_preprocessing(x):
 
 
 def bordering_resize(x, original_image_size, input_image_size):
+    """
+    Resize image by bordering (equal neutral gray border on either side).
+    Currently only supports lists of images that have the same dimensions!
+
+    :param x: torch.Tensor of shape (mini_batch_size, original_image_size[0], original_image_size[0], channels) - the images
+                to be resized
+    :param original_image_size: tuple of (height, width) - the original dimensions of the images
+    :param input_image_size: tuple of (height, width) - the target dimensions of the images
+    :return: torch.Tensor of shape (mini_batch_size, input_image_size[0], input_image_size[1], channels) - the resized images
+    """
+
     # Prepare new image
     new_x = np.full(
         (

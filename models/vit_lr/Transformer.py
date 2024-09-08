@@ -4,11 +4,22 @@ from models.vit_lr.TransformerBlock import TransformerBlock
 
 
 class Transformer(nn.Module):
-    def __init__(self, num_layers, dim, num_heads, tgt_len, ff_dim, dropout, device):
+    def __init__(
+        self,
+        num_layers,
+        mini_batch_size,
+        dim,
+        num_heads,
+        tgt_len,
+        ff_dim,
+        dropout,
+        device,
+    ):
         super().__init__()
         self.blocks = nn.ModuleList(
             [
                 TransformerBlock(
+                    mini_batch_size=mini_batch_size,
                     dim=dim,
                     num_heads=num_heads,
                     tgt_len=tgt_len,
