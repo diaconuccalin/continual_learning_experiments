@@ -185,7 +185,7 @@ class CORE50DataLoader(object):
             if self.use_superclass:
                 y = np.array([int(y_i / 5) for y_i in y], dtype=np.int64)
 
-            return x, torch.from_numpy(y)
+            return x, torch.from_numpy(y).to(torch.long)
 
     def get_batch_from_paths(self, paths):
         # Prepare variable to store the images

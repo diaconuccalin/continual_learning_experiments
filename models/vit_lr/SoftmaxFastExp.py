@@ -19,8 +19,8 @@ class SoftmaxFastExp(Function):
     @staticmethod
     def backward(ctx, grad_output):
         out_data = ctx.saved_tensors[0]
-        sums = torch.sum(grad_output * out_data, 2, keepdim=True).repeat(
-            1, 1, grad_output.shape[-1]
+        sums = torch.sum(grad_output * out_data, -1, keepdim=True).repeat(
+            1, 1, 1, grad_output.shape[-1]
         )
         grad_input = (grad_output - sums) * out_data
 

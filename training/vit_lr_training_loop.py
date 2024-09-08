@@ -46,7 +46,7 @@ def vit_lr_epoch(
 
         # Load on GPU
         x_train = vit_lr_image_preprocessing(x_train).to(device)
-        y_train = y_train.to(torch.float32).to(device)
+        y_train = y_train.to(device)
 
         # Forward
         y_pred = model(x_train)
@@ -191,7 +191,7 @@ def vit_lr_training_pipeline(
         momentum=momentum,
         weight_decay=l2,
     )
-    criterion = torch.nn.BCEWithLogitsLoss()
+    criterion = torch.nn.CrossEntropyLoss()
 
     # Iterate through batches and epochs
     print("Starting the training loop...\n")
