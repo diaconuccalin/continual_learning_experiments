@@ -95,17 +95,6 @@ class CORe50DataLoader(object):
         self.idx_order = None
         self.do_randomization()
 
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        # Mark end of batch
-        if self.idx == len(self.idx_order) - 1:
-            raise StopIteration
-
-        # Prepare the list of image paths
-        img_paths = list()
-
         # Load entire batch scenario
         batch_len = len(self.lup[self.scenario][self.run][self.batch])
         if self.mini_batch_size < 1 or self.mini_batch_size > batch_len:
@@ -118,6 +107,17 @@ class CORe50DataLoader(object):
             self.idx_order = random.sample(
                 self.idx_order, len(self.idx_order) - batch_len % self.mini_batch_size
             )
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        # Mark end of batch
+        if self.idx == len(self.idx_order) - 1:
+            raise StopIteration
+
+        # Prepare the list of image paths
+        img_paths = list()
 
         # Prepare output tensor
         y = np.zeros(self.mini_batch_size, dtype=np.int64)
