@@ -4,11 +4,11 @@ from PIL import Image
 from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
 
-from datasets.core50.CORE50DataLoader import CORE50DataLoader
+from datasets.core50.CORe50DataLoader import CORe50DataLoader
 from datasets.core50.constants import (
     CORE50_CLASS_NAMES,
     CORE50_ROOT_PATH,
-    CORE50_SUPERCLASS_NAMES,
+    CORE50_CATEGORY_NAMES,
 )
 from models.vit_lr.ResizeProcedure import ResizeProcedure
 from models.vit_lr.ViTLR_model import ViTLR
@@ -24,11 +24,11 @@ def vit_lr_single_evaluation(
     original_image_size,
     input_image_size,
     device,
-    use_superclass,
+    category_based_split,
 ):
     # Compute number of classes
-    if use_superclass:
-        num_classes = len(CORE50_SUPERCLASS_NAMES)
+    if category_based_split:
+        num_classes = len(CORE50_CATEGORY_NAMES)
     else:
         num_classes = len(CORE50_CLASS_NAMES)
 
@@ -95,35 +95,34 @@ def vit_lr_evaluation_pipeline(
     current_run,
     num_layers,
     weights_path,
-    use_superclass,
+    category_based_split,
     device,
 ):
     # Compute number of classes
-    if use_superclass:
-        num_classes = len(CORE50_SUPERCLASS_NAMES)
+    if category_based_split:
+        num_classes = len(CORE50_CATEGORY_NAMES)
     else:
         num_classes = len(CORE50_CLASS_NAMES)
 
     # Generate data loader
-    data_loader = CORE50DataLoader(
+    data_loader = CORe50DataLoader(
         root=CORE50_ROOT_PATH,
         original_image_size=(350, 350),
         input_image_size=input_image_size,
         resize_procedure=ResizeProcedure.BORDER,
-        channels=3,
+        image_channels=3,
         scenario=current_task,
-        mini_batch_size=64,
+        mini_batch_size=1,
         start_run=current_run,
-        start_batch=0,
-        eval_mode=True,
+        batch=0,
         start_idx=0,
-        use_superclass=use_superclass,
+        category_based_split=category_based_split,
     )
 
     # Prepare model
     model = ViTLR(
         device=device,
-        mini_batch_size=64,
+        mini_batch_size=1,
         num_layers=num_layers,
         input_size=input_image_size,
         num_classes=num_classes,

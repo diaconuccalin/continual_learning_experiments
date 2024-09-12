@@ -12,26 +12,25 @@ from models.vit_lr.ResizeProcedure import ResizeProcedure
 from models.vit_lr.utils import bordering_resize
 
 
-class CORE50DataLoader(object):
+class CORe50DataLoader(object):
     def __init__(
         self,
         root: str,
         original_image_size: tuple[int, int],
         input_image_size: tuple[int, int],
         resize_procedure: ResizeProcedure = ResizeProcedure.NONE,
-        channels: int = 3,
+        image_channels: int = 3,
         scenario: str = "ni",
         # Any value lower than 1 will lead to loading the entire batch
         mini_batch_size: int = 0,
-        start_batch: int = 0,
+        batch: int = 0,
         start_run: int = 0,
         start_idx: int = 0,
-        eval_mode: bool = False,
         randomize_data_order: bool = False,
-        # If False, use the default 50 classes; if True, use the 10 superclasses,
-        # by mapping each 5 classes into the corresponding superclass
-        # (one superclass contains all the 5 different objects for each of the 10 types).
-        use_superclass: bool = False,
+        # If False, use the default 50 classes; if True, use the 10 categories,
+        # by mapping each 5 classes into the corresponding category
+        # (one category contains all the 5 different objects for each of the 10 types).
+        category_based_split: bool = False,
     ):
         # Check that a resize procedure is provided when needed
         if original_image_size != input_image_size:
@@ -49,7 +48,7 @@ class CORE50DataLoader(object):
             ], "Resizing procedure not compatible. Required to pass to greater size, but shrinking method provided."
 
         # Check if proper channel number
-        assert channels in [1, 3], "Number of channels not allowed."
+        assert image_channels in [1, 3], "Number of image channels not allowed."
 
         # Check if proper scenario
         assert scenario in NEW_TO_OLD_NAMES.keys(), "Provided scenario not allowed."
@@ -59,20 +58,19 @@ class CORE50DataLoader(object):
         self.original_image_size = original_image_size
         self.input_image_size = input_image_size
         self.resize_procedure = resize_procedure
-        self.channels = channels
+        self.in_channels = image_channels
         self.scenario = scenario
         self.mini_batch_size = mini_batch_size
-        self.batch = start_batch
+        self.batch = batch
         self.run = start_run
         self.idx = start_idx
-        self.eval_mode = eval_mode
         self.randomize_data_order = randomize_data_order
-        self.use_superclass = use_superclass
+        self.category_based_split = category_based_split
 
         self.n_batch = constants.N_BATCH
 
-        if use_superclass:
-            self.class_names = constants.CORE50_SUPERCLASS_NAMES
+        if category_based_split:
+            self.class_names = constants.CORE50_CATEGORY_NAMES
         else:
             self.class_names = constants.CORE50_CLASS_NAMES
 
@@ -101,91 +99,65 @@ class CORE50DataLoader(object):
         return self
 
     def __next__(self):
-        if self.batch == self.n_batch[self.scenario] and not self.eval_mode:
+        # Mark end of batch
+        if self.idx == len(self.idx_order) - 1:
             raise StopIteration
 
+        # Prepare the list of image paths
         img_paths = list()
-        # Load entire batch
-        if self.mini_batch_size < 1:
-            # Load ids of batch
-            self.idx_list = [
-                self.lup[self.scenario][self.run][self.batch][i] for i in self.idx_order
-            ]
 
-            # Load image paths
-            for current_idx in self.idx_list:
-                img_paths.append(
-                    os.path.join(
-                        self.root,
-                        "core50_"
-                        + str(self.original_image_size[0])
-                        + "x"
-                        + str(self.original_image_size[1]),
-                        self.paths[current_idx],
-                    )
-                )
-
-            # Load labels
-            y = np.asarray(
-                [
-                    self.labels[self.scenario][self.run][self.batch][i]
-                    for i in self.idx_order
-                ],
-                dtype=np.int64,
+        # Load entire batch scenario
+        batch_len = len(self.lup[self.scenario][self.run][self.batch])
+        if self.mini_batch_size < 1 or self.mini_batch_size > batch_len:
+            print(
+                "Mini batch size provided determines the loading of the entire batch."
+            )
+            self.mini_batch_size = len(self.lup[self.scenario][self.run][self.batch])
+        # If not, remove a number of random images from the train set, such that we exactly fill all the mini-batches
+        else:
+            self.idx_order = random.sample(
+                self.idx_order, len(self.idx_order) - batch_len % self.mini_batch_size
             )
 
-            # Map to superclass if needed
-            if self.use_superclass:
-                y = np.array([int(y_i / 5) for y_i in y], dtype=np.int64)
+        # Prepare output tensor
+        y = np.zeros(self.mini_batch_size, dtype=np.int64)
 
-            # Increment batch counter
-            self.batch += 1
-            self.do_randomization()
-        # Load individual elements
-        else:
-            y = np.zeros(self.mini_batch_size, dtype=np.int64)
-            for mini_batch_element in range(self.mini_batch_size):
-                # If reached end of current batch, go to next one
-                if self.idx == len(self.idx_order):
-                    self.batch += 1
-                    self.do_randomization()
-                    self.idx = 0
-
-                # Load image path
-                img_paths.append(
-                    os.path.join(
-                        self.root,
-                        "core50_"
-                        + str(self.original_image_size[0])
-                        + "x"
-                        + str(self.original_image_size[1]),
-                        self.paths[self.idx_order[self.idx]],
-                    )
+        for mini_batch_element in range(self.mini_batch_size):
+            # Load image path
+            img_paths.append(
+                os.path.join(
+                    self.root,
+                    "core50_"
+                    + str(self.original_image_size[0])
+                    + "x"
+                    + str(self.original_image_size[1]),
+                    self.paths[self.idx_order[self.idx]],
                 )
+            )
 
-                # Load label
-                y[mini_batch_element] = self.labels[self.scenario][self.run][
-                    self.batch
-                ][self.idx_order[self.idx]]
-                self.idx += 1
+            # Load label
+            y[mini_batch_element] = self.labels[self.scenario][self.run][self.batch][
+                self.idx_order[self.idx]
+            ]
+            self.idx += 1
 
-            # Load images
-            x = self.get_batch_from_paths(img_paths).astype(np.uint8)
+        # Load images
+        x = self.get_batch_from_paths(img_paths).astype(np.uint8)
 
-            # Resize image if needed
-            # Case 1: larger target image, resize by bordering (equal neutral gray border on either side)
-            if self.resize_procedure == ResizeProcedure.BORDER:
-                x = bordering_resize(
-                    x,
-                    input_image_size=self.input_image_size,
-                    original_image_size=self.original_image_size,
-                )
+        # Resize image if needed
+        # Case 1: larger target image, resize by bordering (equal neutral gray border on either side)
+        if self.resize_procedure == ResizeProcedure.BORDER:
+            x = bordering_resize(
+                x,
+                input_image_size=self.input_image_size,
+                original_image_size=self.original_image_size,
+            )
 
-            # Map to superclass if needed
-            if self.use_superclass:
-                y = np.array([int(y_i / 5) for y_i in y], dtype=np.int64)
+        # Use category split if required
+        if self.category_based_split:
+            y = np.array([int(y_i / 5) for y_i in y], dtype=np.int64)
 
-            return x, torch.from_numpy(y).to(torch.long)
+        return x, torch.from_numpy(y).to(torch.long)
 
     def get_batch_from_paths(self, paths):
         # Prepare variable to store the images
@@ -194,7 +166,7 @@ class CORE50DataLoader(object):
                 len(paths),
                 self.original_image_size[0],
                 self.original_image_size[1],
-                self.channels,
+                self.in_channels,
             ),
             dtype=np.uint8,
         )
@@ -202,7 +174,7 @@ class CORE50DataLoader(object):
         # Iterate through paths and load images
         for i, path in enumerate(paths):
             # Load as grayscale
-            if self.channels == 1:
+            if self.in_channels == 1:
                 x[i, :, :, 0] = np.array(Image.open(path).convert("L"))
             # Load normally
             else:

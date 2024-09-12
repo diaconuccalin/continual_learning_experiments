@@ -1,6 +1,6 @@
 # Continual Learning Experiments
 
-Core50 data obtained from [here](https://vlomonaco.github.io/core50/index.html#download). The following directory structure is needed, relative to project root directory, for the project to work properly:
+CORe50 data obtained from [here](https://vlomonaco.github.io/core50/index.html#download). The following directory structure is needed, relative to project root directory, for the project to work properly:
 
 ~~~
 .

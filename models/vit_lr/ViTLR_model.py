@@ -10,7 +10,7 @@ class ViTLR(nn.Module):
         self,
         device,
         input_size: tuple[int, int] = (128, 128),
-        mini_batch_size: int = 64,
+        mini_batch_size: int = 32,
         in_channels: int = 3,
         hidden_dimension: int = 768,
         patch_size: tuple[int, int] = (16, 16),
@@ -79,10 +79,16 @@ class ViTLR(nn.Module):
         # b, nph * npw + 1, dim
         x = self.transformer(x)
 
+        # b, nph * npw + 1, dim
         x = torch.tanh(x)
+
+        # b, nph * npw + 1, dim
         x = self.norm(x)[:, 0]
+
+        # b, dim
         x = self.fc(x)
 
+        # b, num_classes
         return x
 
     def set_backbone_trainable(self, trainable: bool):

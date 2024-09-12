@@ -10,7 +10,7 @@ from training.vit_lr_training_loop import vit_lr_training_pipeline
 
 if __name__ == "__main__":
     # Training constants (temporary implementation)
-    use_superclass = False
+    category_based_split = False
 
     # Parse arguments
     parser = argparse.ArgumentParser()
@@ -64,7 +64,7 @@ if __name__ == "__main__":
             session_name=session_name,
             trainable_backbone=True,
             randomize_data_order=True,
-            use_superclass=use_superclass,
+            category_based_split=category_based_split,
         )
     elif pipeline == "vit_lr_core50_evaluation":
         accuracy, conf_mat = vit_lr_evaluation_pipeline(
@@ -74,7 +74,7 @@ if __name__ == "__main__":
             num_layers=12,
             weights_path=weights_path,
             device=device,
-            use_superclass=use_superclass,
+            category_based_split=category_based_split,
         )
 
         # Extract the string up to the file name from weights_path

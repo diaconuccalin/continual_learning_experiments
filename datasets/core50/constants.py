@@ -55,7 +55,7 @@ CORE50_CLASS_NAMES = [
     "remote_control5",
 ]
 
-CORE50_SUPERCLASS_NAMES = [
+CORE50_CATEGORY_NAMES = [
     "adapter",
     "mobile_phone",
     "scissors",
