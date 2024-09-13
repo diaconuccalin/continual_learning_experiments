@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import torch
 from tqdm import tqdm
 
@@ -35,12 +36,11 @@ def vit_lr_epoch(
         mini_batch_size = batch_len
 
     # Setup progress bar
-    loss = 0.0
     progress_bar = tqdm(
         range(batch_len // mini_batch_size),
         colour="green",
         desc="Epoch " + str(current_epoch),
-        postfix={"loss": loss},
+        postfix={"loss": 0.0},
     )
 
     # Implement profiling
@@ -61,9 +61,11 @@ def vit_lr_epoch(
         if profiling_activated:
             prof.step()
 
-        # Prepare loss accumulator
-        loss = torch.tensor(0.0).to(device)
-        loss.requires_grad = True
+        # Reset gradients
+        optimizer.zero_grad()
+
+        # Prepare gradient accumulator
+        grads = list()
 
         for step_in_mini_batch in range(mini_batch_size):
             # Get sample
@@ -76,25 +78,37 @@ def vit_lr_epoch(
             # Forward
             y_pred = model(x_train)
 
-            # Loss accumulator update
-            local_loss = criterion(y_pred, y_train)
-            loss = loss + local_loss
+            # Backward step
+            loss = criterion(y_pred, y_train)
+            loss.backward()
 
-        # Average loss
-        loss /= mini_batch_size
+            # Store loss
+            losses_list.append(loss.item())
 
-        # Backprop
-        optimizer.zero_grad()
-        loss.backward()
+            # Accumulate model gradients
+            if len(grads) == 0:
+                for el in model.parameters():
+                    grads.append(el.grad)
+            else:
+                for i, el in enumerate(model.parameters()):
+                    if grads[i] is not None:
+                        grads[i] += el.grad
+
+            # Reset model gradients
+            model.zero_grad()
+
+        # Set accumulated model gradients to prepare for update
+        for i, el in enumerate(model.parameters()):
+            if grads[i] is not None:
+                el.grad = grads[i] / mini_batch_size
 
         # Update model
         optimizer.step()
 
-        # Store loss
-        losses_list.append(loss.item())
-
         # Update progress bar
-        progress_bar.set_postfix(loss=loss.item())
+        progress_bar.set_postfix(
+            loss=np.array(losses_list[-mini_batch_size:]).sum() / mini_batch_size
+        )
 
     print("\nSaving model...\n")
     torch.save(
