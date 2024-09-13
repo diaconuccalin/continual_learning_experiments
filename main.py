@@ -22,11 +22,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "--weights_path", help="Path to the trained model weights.", required=False
     )
+    parser.add_argument(
+        "--profile",
+        help="Activates profiling, defaults to False.",
+        action="store_true",
+        required=False,
+        default=False,
+    )
     args = parser.parse_args()
 
     session_name = args.session_name
     pipeline = args.pipeline
     weights_path = args.weights_path
+    profiling_activated = args.profile
 
     assert pipeline in [
         "vit_lr_naive_finetune",
@@ -65,7 +73,7 @@ if __name__ == "__main__":
             trainable_backbone=True,
             randomize_data_order=True,
             category_based_split=category_based_split,
-            profiling_activated=False,
+            profiling_activated=profiling_activated,
         )
     elif pipeline == "vit_lr_core50_evaluation":
         accuracy, conf_mat = vit_lr_evaluation_pipeline(
