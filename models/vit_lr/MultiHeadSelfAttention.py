@@ -22,7 +22,10 @@ class MultiHeadSelfAttention(nn.Module):
         self.proj_v = nn.Linear(dim, att_dim, bias=True)
 
         self.scaling = q_rsqrt(self.head_dim).to(device)
+
         self.softmax = SoftmaxFastExp.apply
+        # self.softmax = torch.nn.Softmax(dim=-1)
+
         self.proj_out = nn.Linear(att_dim, dim, bias=False)
 
     def forward(self, x, tgt_len):

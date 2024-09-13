@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import torch
 from tqdm import tqdm
 
@@ -27,6 +28,7 @@ def vit_lr_epoch(
     mini_batch_size,
     save_dir_path,
     device,
+    profiling_activated,
 ):
     losses_list = list()
     batch_len = len(data_loader.lup[current_task][current_run][current_batch])
@@ -34,41 +36,79 @@ def vit_lr_epoch(
         mini_batch_size = batch_len
 
     # Setup progress bar
-    loss = 0.0
     progress_bar = tqdm(
         range(batch_len // mini_batch_size),
         colour="green",
         desc="Epoch " + str(current_epoch),
-        postfix={"loss": loss},
+        postfix={"loss": 0.0},
     )
+
+    # Implement profiling
+    if profiling_activated:
+        prof = torch.profiler.profile(
+            schedule=torch.profiler.schedule(wait=10, warmup=10, active=3, repeat=1),
+            on_trace_ready=torch.profiler.tensorboard_trace_handler("./logs/testing"),
+            record_shapes=True,
+            profile_memory=True,
+            with_stack=True,
+        )
+
+        prof.start()
 
     # Iterate through batch
     for _ in progress_bar:
-        # Get sample
-        x_train, y_train = data_loader.__next__()
+        # Perform profiler step
+        if profiling_activated:
+            prof.step()
 
-        # Load on GPU
-        x_train = vit_lr_image_preprocessing(x_train).to(device)
-        y_train = y_train.to(device)
-
-        # Forward
-        y_pred = model(x_train)
-
-        # Loss computation
-        loss = criterion(y_pred, y_train)
-
-        # Backprop
+        # Reset gradients
         optimizer.zero_grad()
-        loss.backward()
+
+        # Prepare gradient accumulator
+        grads = list()
+
+        for step_in_mini_batch in range(mini_batch_size):
+            # Get sample
+            x_train, y_train = data_loader.__next__()
+
+            # Load on GPU
+            x_train = vit_lr_image_preprocessing(x_train).to(device)
+            y_train = y_train.to(device)
+
+            # Forward
+            y_pred = model(x_train)
+
+            # Backward step
+            loss = criterion(y_pred, y_train)
+            loss.backward()
+
+            # Store loss
+            losses_list.append(loss.item())
+
+            # Accumulate model gradients
+            if len(grads) == 0:
+                for el in model.parameters():
+                    grads.append(el.grad)
+            else:
+                for i, el in enumerate(model.parameters()):
+                    if grads[i] is not None:
+                        grads[i] += el.grad
+
+            # Reset model gradients
+            model.zero_grad()
+
+        # Set accumulated model gradients to prepare for update
+        for i, el in enumerate(model.parameters()):
+            if grads[i] is not None:
+                el.grad = grads[i] / mini_batch_size
 
         # Update model
         optimizer.step()
 
-        # Store loss
-        losses_list.append(loss.item())
-
         # Update progress bar
-        progress_bar.set_postfix(loss=loss.item())
+        progress_bar.set_postfix(
+            loss=np.array(losses_list[-mini_batch_size:]).sum() / mini_batch_size
+        )
 
     print("\nSaving model...\n")
     torch.save(
@@ -98,6 +138,7 @@ def vit_lr_training_pipeline(
     trainable_backbone,
     randomize_data_order,
     category_based_split,
+    profiling_activated,
 ):
     # Compute number of classes
     if category_based_split:
@@ -114,7 +155,7 @@ def vit_lr_training_pipeline(
         resize_procedure=ResizeProcedure.BORDER,
         image_channels=3,
         scenario=current_task,
-        mini_batch_size=32,
+        mini_batch_size=1,
         start_run=current_run,
         randomize_data_order=randomize_data_order,
         category_based_split=category_based_split,
@@ -128,7 +169,7 @@ def vit_lr_training_pipeline(
     if os.path.exists(save_path):
         print(
             "\n\nA session with the same name already exists in the directory containing the saved models. "
-            "\nANY EXISTING RESULT WILL BE OVERWRITTEN!\n\n"
+            "\nANY EXISTING RESULT WILL BE OVERWRITTEN AT THE END OF EACH EPOCH!\n\n"
         )
     else:
         if not os.path.exists(root_path):
@@ -140,7 +181,7 @@ def vit_lr_training_pipeline(
     # Generate model object
     model = ViTLR(
         device=device,
-        mini_batch_size=32,
+        mini_batch_size=1,
         num_layers=num_layers,
         input_size=input_image_size,
         num_classes=num_classes,
@@ -221,4 +262,5 @@ def vit_lr_training_pipeline(
                 mini_batch_size=32,
                 save_dir_path=save_path,
                 device=device,
+                profiling_activated=profiling_activated,
             )
