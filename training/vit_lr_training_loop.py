@@ -27,6 +27,7 @@ def vit_lr_epoch(
     mini_batch_size,
     save_dir_path,
     device,
+    profiling_activated,
 ):
     losses_list = list()
     batch_len = len(data_loader.lup[current_task][current_run][current_batch])
@@ -42,8 +43,24 @@ def vit_lr_epoch(
         postfix={"loss": loss},
     )
 
+    # Implement profiling
+    if profiling_activated:
+        prof = torch.profiler.profile(
+            schedule=torch.profiler.schedule(wait=10, warmup=10, active=3, repeat=1),
+            on_trace_ready=torch.profiler.tensorboard_trace_handler("./logs/testing"),
+            record_shapes=True,
+            profile_memory=True,
+            with_stack=True,
+        )
+
+        prof.start()
+
     # Iterate through batch
     for _ in progress_bar:
+        # Perform profiler step
+        if profiling_activated:
+            prof.step()
+
         # Prepare loss accumulator
         loss = torch.tensor(0.0).to(device)
         loss.requires_grad = True
@@ -107,6 +124,7 @@ def vit_lr_training_pipeline(
     trainable_backbone,
     randomize_data_order,
     category_based_split,
+    profiling_activated,
 ):
     # Compute number of classes
     if category_based_split:
@@ -230,4 +248,5 @@ def vit_lr_training_pipeline(
                 mini_batch_size=32,
                 save_dir_path=save_path,
                 device=device,
+                profiling_activated=profiling_activated,
             )

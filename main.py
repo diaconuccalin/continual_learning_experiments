@@ -65,6 +65,7 @@ if __name__ == "__main__":
             trainable_backbone=True,
             randomize_data_order=True,
             category_based_split=category_based_split,
+            profiling_activated=False,
         )
     elif pipeline == "vit_lr_core50_evaluation":
         accuracy, conf_mat = vit_lr_evaluation_pipeline(
