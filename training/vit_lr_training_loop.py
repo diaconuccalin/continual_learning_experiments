@@ -44,18 +44,27 @@ def vit_lr_epoch(
 
     # Iterate through batch
     for _ in progress_bar:
-        # Get sample
-        x_train, y_train = data_loader.__next__()
+        # Prepare loss accumulator
+        loss = torch.tensor(0.0).to(device)
+        loss.requires_grad = True
 
-        # Load on GPU
-        x_train = vit_lr_image_preprocessing(x_train).to(device)
-        y_train = y_train.to(device)
+        for step_in_mini_batch in range(mini_batch_size):
+            # Get sample
+            x_train, y_train = data_loader.__next__()
 
-        # Forward
-        y_pred = model(x_train)
+            # Load on GPU
+            x_train = vit_lr_image_preprocessing(x_train).to(device)
+            y_train = y_train.to(device)
 
-        # Loss computation
-        loss = criterion(y_pred, y_train)
+            # Forward
+            y_pred = model(x_train)
+
+            # Loss accumulator update
+            local_loss = criterion(y_pred, y_train)
+            loss = loss + local_loss
+
+        # Average loss
+        loss /= mini_batch_size
 
         # Backprop
         optimizer.zero_grad()
@@ -114,7 +123,7 @@ def vit_lr_training_pipeline(
         resize_procedure=ResizeProcedure.BORDER,
         image_channels=3,
         scenario=current_task,
-        mini_batch_size=32,
+        mini_batch_size=1,
         start_run=current_run,
         randomize_data_order=randomize_data_order,
         category_based_split=category_based_split,
@@ -128,7 +137,7 @@ def vit_lr_training_pipeline(
     if os.path.exists(save_path):
         print(
             "\n\nA session with the same name already exists in the directory containing the saved models. "
-            "\nANY EXISTING RESULT WILL BE OVERWRITTEN!\n\n"
+            "\nANY EXISTING RESULT WILL BE OVERWRITTEN AT THE END OF EACH EPOCH!\n\n"
         )
     else:
         if not os.path.exists(root_path):
@@ -140,7 +149,7 @@ def vit_lr_training_pipeline(
     # Generate model object
     model = ViTLR(
         device=device,
-        mini_batch_size=32,
+        mini_batch_size=1,
         num_layers=num_layers,
         input_size=input_image_size,
         num_classes=num_classes,
