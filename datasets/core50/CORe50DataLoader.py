@@ -91,7 +91,7 @@ class CORe50DataLoader(object):
         print("Labels loaded")
 
         # Randomize data order if needed
-        print("Randomizing data order...")
+        print("Randomizing data order if required...")
         self.idx_order = None
         self.do_randomization()
 

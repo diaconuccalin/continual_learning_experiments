@@ -9,6 +9,7 @@ from datasets.core50.constants import (
     CORE50_CLASS_NAMES,
     CORE50_ROOT_PATH,
     CORE50_CATEGORY_NAMES,
+    NI_TESTING_BATCH,
 )
 from models.vit_lr.ResizeProcedure import ResizeProcedure
 from models.vit_lr.ViTLR_model import ViTLR
@@ -114,7 +115,7 @@ def vit_lr_evaluation_pipeline(
         scenario=current_task,
         mini_batch_size=1,
         start_run=current_run,
-        batch=0,
+        batch=NI_TESTING_BATCH,
         start_idx=0,
         category_based_split=category_based_split,
     )
@@ -146,7 +147,7 @@ def vit_lr_evaluation_pipeline(
     # Compute accuracy
     n_correct_preds = 0
     preds_so_far = 0
-    total_samples = len(data_loader.lup[current_task][current_run][8]) - 1
+    total_samples = len(data_loader.lup[current_task][current_run][NI_TESTING_BATCH]) - 1
 
     # Store for conf matrix
     all_y_trains = list()
