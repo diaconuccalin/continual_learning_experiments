@@ -7,7 +7,6 @@ class Transformer(nn.Module):
     def __init__(
         self,
         num_layers,
-        mini_batch_size,
         dim,
         num_heads,
         tgt_len,
@@ -19,7 +18,6 @@ class Transformer(nn.Module):
         self.blocks = nn.ModuleList(
             [
                 TransformerBlock(
-                    mini_batch_size=mini_batch_size,
                     dim=dim,
                     num_heads=num_heads,
                     tgt_len=tgt_len,

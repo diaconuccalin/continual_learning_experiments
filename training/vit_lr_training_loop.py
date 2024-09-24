@@ -181,7 +181,6 @@ def vit_lr_training_pipeline(
     # Generate model object
     model = ViTLR(
         device=device,
-        mini_batch_size=1,
         num_layers=num_layers,
         input_size=input_image_size,
         num_classes=num_classes,

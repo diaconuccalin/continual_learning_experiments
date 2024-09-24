@@ -10,7 +10,6 @@ class ViTLR(nn.Module):
         self,
         device,
         input_size: tuple[int, int] = (128, 128),
-        mini_batch_size: int = 32,
         in_channels: int = 3,
         hidden_dimension: int = 768,
         patch_size: tuple[int, int] = (16, 16),
@@ -49,7 +48,6 @@ class ViTLR(nn.Module):
 
         self.transformer = Transformer(
             num_layers=num_layers,
-            mini_batch_size=mini_batch_size,
             dim=hidden_dimension,
             num_heads=num_heads,
             tgt_len=self.seq_len,
