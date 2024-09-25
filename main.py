@@ -135,7 +135,7 @@ def vit_rehearsal_train():
 def latent_replay_native_cumulative():
     vit_native_rehearsal_training_pipeline(
         batches=NIC_CUMULATIVE_TRAINING_BATCHES,
-        epochs_per_batch=1,
+        epochs_per_batch=-1,
         initial_lr=0.01,
         momentum=0.9,
         l2=0.0005,
@@ -143,7 +143,7 @@ def latent_replay_native_cumulative():
         current_task="nic",
         current_run=0,
         num_layers=12,
-        mini_batch_size=0,
+        mini_batch_size=128,
         exemplar_set_ratio=0.0,
         device=device,
         pretrained_weights_path="weights/pretrained_imagenet/B_16_imagenet1k.pth",

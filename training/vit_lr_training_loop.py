@@ -1,6 +1,5 @@
 import os
 
-import numpy as np
 import torch
 from tqdm import tqdm
 
@@ -23,18 +22,13 @@ def vit_lr_epoch(
     criterion,
     current_epoch,
     total_epochs,
-    current_task,
-    current_run,
-    current_batch,
     mini_batch_size,
     save_dir_path,
     device,
     profiling_activated,
 ):
     losses_list = list()
-    batch_len = len(data_loader.lup[current_task][current_run][current_batch]) + sum(
-        [len(data_loader.exemplar_set[key]) for key in data_loader.exemplar_set.keys()]
-    )
+    batch_len = len(data_loader.idx_order)
     if mini_batch_size < 1 or mini_batch_size > batch_len:
         mini_batch_size = batch_len
 
@@ -119,6 +113,11 @@ def vit_lr_epoch(
             # Reset model gradients
             model.zero_grad()
 
+            if steps_number <= 1:
+                sub_progress_bar.set_postfix(
+                    loss=sum(losses_list[-step_in_mini_batch:]) / step_in_mini_batch
+                )
+
         if data_loader.debug_mode:
             continue
 
@@ -131,9 +130,10 @@ def vit_lr_epoch(
         optimizer.step()
 
         # Update progress bar
-        progress_bar.set_postfix(
-            loss=np.array(losses_list[-mini_batch_size:]).sum() / mini_batch_size
-        )
+        if steps_number > 1:
+            progress_bar.set_postfix(
+                loss=sum(losses_list[-mini_batch_size:]) / mini_batch_size
+            )
 
     # Save model only when debug mode is not active
     if not data_loader.debug_mode:
@@ -151,6 +151,8 @@ def vit_lr_epoch(
 
 def vit_native_rehearsal_training_pipeline(
     batches,
+    # If value set to anything lower than 1, the training loop will run for 1 epoch
+    # over all the batches considered as a single batch
     epochs_per_batch,
     initial_lr,
     momentum,
@@ -273,31 +275,52 @@ def vit_native_rehearsal_training_pipeline(
 
     # Iterate through batches and epochs
     print("Starting the training loop...\n")
-    current_epoch = 0
-    for current_batch in batches:
-        for e in range(epochs_per_batch):
-            current_epoch += 1
 
-            # Set data loader parameters
-            data_loader.update_batch(current_batch)
-            data_loader.idx = 0
+    if epochs_per_batch < 1:
+        # Set data loader parameters
+        data_loader.update_batch(batches)
+        data_loader.idx = 0
 
-            # Run epoch
-            vit_lr_epoch(
-                model=model,
-                data_loader=data_loader,
-                optimizer=optimizer,
-                criterion=criterion,
-                current_epoch=current_epoch,
-                total_epochs=epochs_per_batch * len(batches),
-                current_task=current_task,
-                current_run=current_run,
-                current_batch=current_batch,
-                mini_batch_size=mini_batch_size,
-                save_dir_path=save_path,
-                device=device,
-                profiling_activated=profiling_activated,
-            )
+        # Run epoch
+        vit_lr_epoch(
+            model=model,
+            data_loader=data_loader,
+            optimizer=optimizer,
+            criterion=criterion,
+            current_epoch=1,
+            total_epochs=1,
+            mini_batch_size=mini_batch_size,
+            save_dir_path=save_path,
+            device=device,
+            profiling_activated=profiling_activated,
+        )
 
-            # Update for rehearsal
-            data_loader.update_exemplar_set()
+        # Update for rehearsal
+        data_loader.update_exemplar_set()
+    else:
+        current_epoch = 0
+
+        for current_batch in batches:
+            for e in range(epochs_per_batch):
+                current_epoch += 1
+
+                # Set data loader parameters
+                data_loader.update_batch(current_batch)
+                data_loader.idx = 0
+
+                # Run epoch
+                vit_lr_epoch(
+                    model=model,
+                    data_loader=data_loader,
+                    optimizer=optimizer,
+                    criterion=criterion,
+                    current_epoch=current_epoch,
+                    total_epochs=epochs_per_batch * len(batches),
+                    mini_batch_size=mini_batch_size,
+                    save_dir_path=save_path,
+                    device=device,
+                    profiling_activated=profiling_activated,
+                )
+
+                # Update for rehearsal
+                data_loader.update_exemplar_set()

@@ -108,7 +108,7 @@ class CORe50DataLoader(object):
 
     def __next__(self):
         # Mark end of batch
-        if self.idx == len(self.idx_order) - 1:
+        if self.idx == len(self.idx_order):
             raise StopIteration
 
         # Prepare the list of image paths
@@ -194,7 +194,12 @@ class CORe50DataLoader(object):
     # Function that randomizes data order
     def do_randomization(self):
         # Get current batch ids
-        self.idx_order = list(self.lup[self.scenario][self.run][self.batch])
+        if isinstance(self.batch, list):
+            self.idx_order = list()
+            for b in self.batch:
+                self.idx_order += list(self.lup[self.scenario][self.run][b])
+        else:
+            self.idx_order = list(self.lup[self.scenario][self.run][self.batch])
 
         # Add exemplar set to id list
         for key in self.exemplar_set.keys():
