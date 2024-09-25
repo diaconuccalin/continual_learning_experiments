@@ -9,6 +9,7 @@ from datasets.core50.constants import (
     CORE50_ROOT_PATH,
     CORE50_CATEGORY_NAMES,
     CORE50_CLASS_NAMES,
+    NEW_TO_OLD_NAMES,
 )
 from models.vit_lr.ResizeProcedure import ResizeProcedure
 from models.vit_lr.ViTLR_model import ViTLR
@@ -31,13 +32,15 @@ def vit_lr_epoch(
     profiling_activated,
 ):
     losses_list = list()
-    batch_len = len(data_loader.lup[current_task][current_run][current_batch])
+    batch_len = len(data_loader.lup[current_task][current_run][current_batch]) + sum(
+        [len(data_loader.exemplar_set[key]) for key in data_loader.exemplar_set.keys()]
+    )
     if mini_batch_size < 1 or mini_batch_size > batch_len:
         mini_batch_size = batch_len
 
     # Setup progress bar
     progress_bar = tqdm(
-        range(batch_len // mini_batch_size),
+        range((batch_len) // mini_batch_size),
         colour="green",
         desc="Epoch " + str(current_epoch),
         postfix={"loss": 0.0},
@@ -71,6 +74,9 @@ def vit_lr_epoch(
             # Get sample
             x_train, y_train = data_loader.__next__()
 
+            if data_loader.debug_mode:
+                continue
+
             # Load on GPU
             x_train = vit_lr_image_preprocessing(x_train).to(device)
             y_train = y_train.to(device)
@@ -97,6 +103,9 @@ def vit_lr_epoch(
             # Reset model gradients
             model.zero_grad()
 
+        if data_loader.debug_mode:
+            continue
+
         # Set accumulated model gradients to prepare for update
         for i, el in enumerate(model.parameters()):
             if grads[i] is not None:
@@ -110,19 +119,21 @@ def vit_lr_epoch(
             loss=np.array(losses_list[-mini_batch_size:]).sum() / mini_batch_size
         )
 
-    print("\nSaving model...\n")
-    torch.save(
-        {
-            "epoch": current_epoch,
-            "model_state_dict": model.state_dict(),
-            "optimizer": optimizer.state_dict(),
-            "loss": losses_list,
-        },
-        os.path.join(save_dir_path, "checkpoint_e" + str(current_epoch) + ".pth"),
-    )
+    # Save model only when debug mode is not active
+    if not data_loader.debug_mode:
+        print("\nSaving model...\n")
+        torch.save(
+            {
+                "epoch": current_epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "loss": losses_list,
+            },
+            os.path.join(save_dir_path, "checkpoint_e" + str(current_epoch) + ".pth"),
+        )
 
 
-def vit_lr_training_pipeline(
+def vit_naive_rehearsal_training_pipeline(
     batches,
     epochs_per_batch,
     initial_lr,
@@ -132,6 +143,7 @@ def vit_lr_training_pipeline(
     current_task,
     current_run,
     num_layers,
+    exemplar_set_ratio,
     device,
     pretrained_weights_path,
     session_name,
@@ -139,7 +151,11 @@ def vit_lr_training_pipeline(
     randomize_data_order,
     category_based_split,
     profiling_activated,
+    data_loader_debug_mode=False,
 ):
+    # Obtain old scenario name
+    current_task = NEW_TO_OLD_NAMES[current_task]
+
     # Compute number of classes
     if category_based_split:
         num_classes = len(CORE50_CATEGORY_NAMES)
@@ -156,9 +172,11 @@ def vit_lr_training_pipeline(
         image_channels=3,
         scenario=current_task,
         mini_batch_size=1,
+        exemplar_set_ratio=exemplar_set_ratio,
         start_run=current_run,
         randomize_data_order=randomize_data_order,
         category_based_split=category_based_split,
+        debug_mode=data_loader_debug_mode,
     )
 
     # Prepare model save path
@@ -181,7 +199,6 @@ def vit_lr_training_pipeline(
     # Generate model object
     model = ViTLR(
         device=device,
-        mini_batch_size=1,
         num_layers=num_layers,
         input_size=input_image_size,
         num_classes=num_classes,
@@ -245,7 +262,7 @@ def vit_lr_training_pipeline(
             current_epoch += 1
 
             # Set data loader parameters
-            data_loader.batch = current_batch
+            data_loader.update_batch(current_batch)
             data_loader.idx = 0
 
             # Run epoch
@@ -264,3 +281,6 @@ def vit_lr_training_pipeline(
                 device=device,
                 profiling_activated=profiling_activated,
             )
+
+            # Update for rehearsal
+            data_loader.update_exemplar_set()

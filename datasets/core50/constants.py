@@ -2,6 +2,15 @@ NEW_TO_OLD_NAMES = {"ni": "ni", "multi-task-nc": "nc", "nic": "nicv2_391"}
 
 N_BATCH = {"ni": 8, "nc": 9, "nicv2_391": 391}
 
+CORE50_ROOT_PATH = "datasets/core50/data"
+
+NI_TRAINING_BATCHES = list(range(8))
+NI_TESTING_BATCH = 8
+
+NC_TRAINING_BATCHES = list(range(9))
+NC_TESTING_BATCH = 9
+NC_TRAINING_SET_SIZE = 119712
+
 CORE50_CLASS_NAMES = [
     "adapter1",
     "adapter2",
@@ -67,8 +76,3 @@ CORE50_CATEGORY_NAMES = [
     "cup",
     "remote_control",
 ]
-
-CORE50_ROOT_PATH = "datasets/core50/data"
-
-NI_TRAINING_BATCHES = list(range(8))
-NI_TESTING_BATCH = 8

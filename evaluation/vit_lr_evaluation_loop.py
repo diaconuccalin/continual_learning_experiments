@@ -36,7 +36,6 @@ def vit_lr_single_evaluation(
     # Create model object
     model = ViTLR(
         device=device,
-        mini_batch_size=mini_batch_size,
         num_layers=num_layers,
         input_size=input_size,
         num_classes=num_classes,
@@ -123,7 +122,6 @@ def vit_lr_evaluation_pipeline(
     # Prepare model
     model = ViTLR(
         device=device,
-        mini_batch_size=1,
         num_layers=num_layers,
         input_size=input_image_size,
         num_classes=num_classes,
@@ -147,7 +145,9 @@ def vit_lr_evaluation_pipeline(
     # Compute accuracy
     n_correct_preds = 0
     preds_so_far = 0
-    total_samples = len(data_loader.lup[current_task][current_run][NI_TESTING_BATCH]) - 1
+    total_samples = (
+        len(data_loader.lup[current_task][current_run][NI_TESTING_BATCH]) - 1
+    )
 
     # Store for conf matrix
     all_y_trains = list()

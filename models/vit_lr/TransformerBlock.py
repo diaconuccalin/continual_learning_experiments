@@ -5,15 +5,12 @@ from models.vit_lr.PositionWiseFeedForward import PositionWiseFeedForward
 
 
 class TransformerBlock(nn.Module):
-    def __init__(
-        self, mini_batch_size, dim, num_heads, tgt_len, ff_dim, dropout, device
-    ):
+    def __init__(self, dim, num_heads, tgt_len, ff_dim, dropout, device):
         super().__init__()
         self.tgt_len = tgt_len
 
         self.norm1 = nn.LayerNorm(dim, eps=1e-6)
         self.attn = MultiHeadSelfAttention(
-            mini_batch_size=mini_batch_size,
             dim=dim,
             n_heads=num_heads,
             att_dim=dim,
