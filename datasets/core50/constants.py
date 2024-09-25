@@ -1,3 +1,5 @@
+import random
+
 NEW_TO_OLD_NAMES = {"ni": "ni", "multi-task-nc": "nc", "nic": "nicv2_391"}
 
 N_BATCH = {"ni": 8, "nc": 9, "nicv2_391": 391}
@@ -10,6 +12,10 @@ NI_TESTING_BATCH = 8
 NC_TRAINING_BATCHES = list(range(9))
 NC_TESTING_BATCH = 9
 NC_TRAINING_SET_SIZE = 119712
+
+NIC_CUMULATIVE_TRAINING_BATCHES = [
+    0,
+] + random.sample(list(range(1, 391)), 390)
 
 CORE50_CLASS_NAMES = [
     "adapter1",

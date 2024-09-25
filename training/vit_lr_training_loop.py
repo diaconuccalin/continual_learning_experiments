@@ -38,13 +38,17 @@ def vit_lr_epoch(
     if mini_batch_size < 1 or mini_batch_size > batch_len:
         mini_batch_size = batch_len
 
-    # Setup progress bar
-    progress_bar = tqdm(
-        range((batch_len) // mini_batch_size),
-        colour="green",
-        desc="Epoch " + str(current_epoch),
-        postfix={"loss": 0.0},
-    )
+    # Setup progress bar for mini-batches smaller than entire batch
+    steps_number = batch_len // mini_batch_size
+    if steps_number > 1:
+        progress_bar = tqdm(
+            range(steps_number),
+            colour="green",
+            desc="Epoch " + str(current_epoch) + "/" + str(total_epochs),
+            postfix={"loss": 0.0},
+        )
+    else:
+        progress_bar = range(steps_number)
 
     # Implement profiling
     if profiling_activated:
@@ -70,7 +74,19 @@ def vit_lr_epoch(
         # Prepare gradient accumulator
         grads = list()
 
-        for step_in_mini_batch in range(mini_batch_size):
+        # Setup progress bar for mini-batches of the same size as the entire batch
+        if steps_number <= 1:
+            sub_progress_bar = tqdm(
+                range(mini_batch_size),
+                colour="green",
+                desc="Epoch " + str(current_epoch) + "/" + str(total_epochs),
+                postfix={"loss": 0.0},
+            )
+        else:
+            sub_progress_bar = range(mini_batch_size)
+
+        # Iterate through mini-batch
+        for step_in_mini_batch in sub_progress_bar:
             # Get sample
             x_train, y_train = data_loader.__next__()
 
@@ -133,7 +149,7 @@ def vit_lr_epoch(
         )
 
 
-def vit_naive_rehearsal_training_pipeline(
+def vit_native_rehearsal_training_pipeline(
     batches,
     epochs_per_batch,
     initial_lr,
@@ -143,6 +159,7 @@ def vit_naive_rehearsal_training_pipeline(
     current_task,
     current_run,
     num_layers,
+    mini_batch_size,
     exemplar_set_ratio,
     device,
     pretrained_weights_path,
@@ -276,7 +293,7 @@ def vit_naive_rehearsal_training_pipeline(
                 current_task=current_task,
                 current_run=current_run,
                 current_batch=current_batch,
-                mini_batch_size=32,
+                mini_batch_size=mini_batch_size,
                 save_dir_path=save_path,
                 device=device,
                 profiling_activated=profiling_activated,
