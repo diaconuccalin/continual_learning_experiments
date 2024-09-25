@@ -4,9 +4,11 @@ import os
 import numpy as np
 import torch
 
-from datasets.core50.constants import NI_TRAINING_BATCHES
+from datasets.core50.constants import NI_TRAINING_BATCHES, NC_TRAINING_BATCHES
 from evaluation.vit_lr_evaluation_loop import vit_lr_evaluation_pipeline
-from training.vit_lr_training_loop import vit_lr_training_pipeline
+from training.vit_lr_training_loop import (
+    vit_naive_rehearsal_training_pipeline,
+)
 
 if __name__ == "__main__":
     # Training constants (temporary implementation)
@@ -29,15 +31,31 @@ if __name__ == "__main__":
         required=False,
         default=False,
     )
+    parser.add_argument(
+        "--exemplar_set_ratio",
+        help="Defines the ratio of the entire training set to be stored as exemplars.",
+        required=False,
+        default=0.0,
+    )
+    parser.add_argument(
+        "--data_loader_debug_mode",
+        help="Activates the data loader debug mode, defaults to False.",
+        action="store_true",
+        required=False,
+        default=False,
+    )
     args = parser.parse_args()
 
     session_name = args.session_name
     pipeline = args.pipeline
     weights_path = args.weights_path
     profiling_activated = args.profile
+    exemplar_set_ratio = float(args.exemplar_set_ratio)
+    data_loader_debug_mode = args.data_loader_debug_mode
 
     assert pipeline in [
-        "vit_lr_naive_finetune",
+        "vit_demo_naive_finetune",
+        "vit_rehearsal_train",
         "vit_lr_core50_evaluation",
     ], "Pipeline currently not supported."
 
@@ -56,8 +74,8 @@ if __name__ == "__main__":
         device = torch.device("cpu")
 
     # Run chosen pipeline
-    if pipeline == "vit_lr_naive_finetune":
-        vit_lr_training_pipeline(
+    if pipeline == "vit_demo_naive_finetune":
+        vit_naive_rehearsal_training_pipeline(
             batches=NI_TRAINING_BATCHES,
             epochs_per_batch=10,
             initial_lr=0.01,
@@ -67,6 +85,7 @@ if __name__ == "__main__":
             current_task="ni",
             current_run=0,
             num_layers=12,
+            exemplar_set_ratio=0.0,
             device=device,
             pretrained_weights_path="weights/pretrained_imagenet/B_16_imagenet1k.pth",
             session_name=session_name,
@@ -107,3 +126,24 @@ if __name__ == "__main__":
         np.savetxt(saving_path_conf_mat, conf_mat)
 
         print("Evaluation successfully completed!")
+    elif pipeline == "vit_rehearsal_train":
+        vit_naive_rehearsal_training_pipeline(
+            batches=NC_TRAINING_BATCHES,
+            epochs_per_batch=1,
+            initial_lr=0.01,
+            momentum=0.9,
+            l2=0.0005,
+            input_image_size=(384, 384),
+            current_task="multi-task-nc",
+            current_run=0,
+            num_layers=12,
+            exemplar_set_ratio=exemplar_set_ratio,
+            device=device,
+            pretrained_weights_path="weights/pretrained_imagenet/B_16_imagenet1k.pth",
+            session_name=session_name,
+            trainable_backbone=True,
+            randomize_data_order=True,
+            category_based_split=category_based_split,
+            profiling_activated=profiling_activated,
+            data_loader_debug_mode=data_loader_debug_mode,
+        )
