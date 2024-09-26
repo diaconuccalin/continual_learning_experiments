@@ -8,6 +8,9 @@ from datasets.core50.constants import (
     NC_TRAINING_BATCHES,
     NIC_CUMULATIVE_TRAINING_BATCHES,
     CORE50_CATEGORY_NAMES,
+    NI_TESTING_BATCH,
+    NC_TESTING_BATCH,
+    NIC_CUMULATIVE_TESTING_BATCH,
 )
 from evaluation.evaluation_utils import plot_confusion_matrix, plot_losses
 from evaluation.vit_lr_evaluation_loop import vit_lr_evaluation_pipeline
@@ -41,10 +44,11 @@ def create_arg_parser():
         default=False,
     )
     parser.add_argument(
-        "--exemplar_set_ratio",
-        help="Defines the ratio of the entire training set to be stored as exemplars.",
+        "--rehearsal_memory_size",
+        "-rm_size",
+        help="Defines the number of patterns to be stored in the rehearsal memory.",
         required=False,
-        default=0.0,
+        default=0,
     )
     parser.add_argument(
         "--data_loader_debug_mode",
@@ -71,7 +75,7 @@ def vit_demo_naive_finetune(
         current_run=0,
         num_layers=12,
         mini_batch_size=32,
-        exemplar_set_ratio=0.0,
+        rehearsal_memory_size=0,
         device=device,
         pretrained_weights_path="weights/pretrained_imagenet/B_16_imagenet1k.pth",
         session_name=session_name,
@@ -83,7 +87,18 @@ def vit_demo_naive_finetune(
 
 
 def vit_lr_core50_evaluation(device, weights_path, category_based_split, current_task):
+    # Choose batch
+    if current_task == "ni":
+        batch = NI_TESTING_BATCH
+    elif current_task in ["nc", "multi-task-nc"]:
+        batch = NC_TESTING_BATCH
+    elif current_task in ["nic", "nicv2_391"]:
+        batch = NIC_CUMULATIVE_TESTING_BATCH
+    else:
+        raise ValueError("Invalid task name!")
+
     losses, accuracy, conf_mat = vit_lr_evaluation_pipeline(
+        batch=batch,
         input_image_size=(384, 384),
         current_task=current_task,
         current_run=0,
@@ -133,15 +148,25 @@ def vit_lr_core50_evaluation(device, weights_path, category_based_split, current
 
 def vit_rehearsal_train(
     device,
-    exemplar_set_ratio,
+    rehearsal_memory_size,
     session_name,
     category_based_split,
     profiling_activated,
     data_loader_debug_mode,
     current_task,
 ):
+    # Choose batches
+    if current_task == "ni":
+        batches = NI_TRAINING_BATCHES
+    elif current_task in ["nc", "multi-task-nc"]:
+        batches = NC_TRAINING_BATCHES
+    elif current_task in ["nic", "nicv2_391"]:
+        batches = NIC_CUMULATIVE_TRAINING_BATCHES
+    else:
+        raise ValueError("Invalid task name!")
+
     vit_native_rehearsal_training_pipeline(
-        batches=NC_TRAINING_BATCHES,
+        batches=batches,
         epochs_per_batch=1,
         initial_lr=0.01,
         momentum=0.9,
@@ -151,7 +176,7 @@ def vit_rehearsal_train(
         current_run=0,
         num_layers=12,
         mini_batch_size=32,
-        exemplar_set_ratio=exemplar_set_ratio,
+        rehearsal_memory_size=rehearsal_memory_size,
         device=device,
         pretrained_weights_path="weights/pretrained_imagenet/B_16_imagenet1k.pth",
         session_name=session_name,
@@ -166,8 +191,18 @@ def vit_rehearsal_train(
 def latent_replay_native_cumulative(
     device, session_name, profiling_activated, data_loader_debug_mode, current_task
 ):
+    # Choose batches
+    if current_task == "ni":
+        batches = NI_TRAINING_BATCHES
+    elif current_task in ["nc", "multi-task-nc"]:
+        batches = NC_TRAINING_BATCHES
+    elif current_task in ["nic", "nicv2_391"]:
+        batches = NIC_CUMULATIVE_TRAINING_BATCHES
+    else:
+        raise ValueError("Invalid task name!")
+
     vit_native_rehearsal_training_pipeline(
-        batches=NIC_CUMULATIVE_TRAINING_BATCHES,
+        batches=batches,
         epochs_per_batch=-1,
         initial_lr=0.01,
         momentum=0.9,
@@ -177,7 +212,7 @@ def latent_replay_native_cumulative(
         current_run=0,
         num_layers=12,
         mini_batch_size=128,
-        exemplar_set_ratio=0.0,
+        rehearsal_memory_size=0,
         device=device,
         pretrained_weights_path="weights/pretrained_imagenet/B_16_imagenet1k.pth",
         session_name=session_name,
@@ -201,7 +236,7 @@ def main():
     pipeline = args.pipeline
     weights_path = args.weights_path
     profiling_activated = args.profile
-    exemplar_set_ratio = float(args.exemplar_set_ratio)
+    rehearsal_memory_size = int(args.rehearsal_memory_size)
     data_loader_debug_mode = args.data_loader_debug_mode
     current_task = args.current_task
 
@@ -246,7 +281,7 @@ def main():
     elif pipeline == "vit_rehearsal_train":
         vit_rehearsal_train(
             device=device,
-            exemplar_set_ratio=exemplar_set_ratio,
+            rehearsal_memory_size=rehearsal_memory_size,
             session_name=session_name,
             category_based_split=category_based_split,
             profiling_activated=profiling_activated,

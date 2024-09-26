@@ -9,9 +9,6 @@ from datasets.core50.constants import (
     CORE50_CLASS_NAMES,
     CORE50_ROOT_PATH,
     CORE50_CATEGORY_NAMES,
-    NI_TESTING_BATCH,
-    NIC_CUMULATIVE_TESTING_BATCH,
-    NC_TESTING_BATCH,
 )
 from models.vit_lr.ResizeProcedure import ResizeProcedure
 from models.vit_lr.ViTLR_model import ViTLR
@@ -92,6 +89,7 @@ def vit_lr_single_evaluation(
 
 
 def vit_lr_evaluation_pipeline(
+    batch,
     input_image_size,
     current_task,
     current_run,
@@ -105,16 +103,6 @@ def vit_lr_evaluation_pipeline(
         num_classes = len(CORE50_CATEGORY_NAMES)
     else:
         num_classes = len(CORE50_CLASS_NAMES)
-
-    # Choose batch
-    if current_task == "ni":
-        batch = NI_TESTING_BATCH
-    elif current_task in ["nc", "multi-task-nc"]:
-        batch = NC_TESTING_BATCH
-    elif current_task in ["nic", "nicv2_391"]:
-        batch = NIC_CUMULATIVE_TESTING_BATCH
-    else:
-        raise ValueError("Invalid task name!")
 
     # Generate data loader
     data_loader = CORe50DataLoader(

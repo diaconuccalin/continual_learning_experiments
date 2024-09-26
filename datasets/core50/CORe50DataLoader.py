@@ -21,7 +21,7 @@ class CORe50DataLoader(object):
         resize_procedure: ResizeProcedure = ResizeProcedure.NONE,
         image_channels: int = 3,
         scenario: str = "ni",
-        exemplar_set_ratio: float = 0.0,
+        rehearsal_memory_size: int = 0,
         # Any value lower than 1 will lead to loading the entire batch
         mini_batch_size: int = 0,
         batch: int = 0,
@@ -70,10 +70,11 @@ class CORe50DataLoader(object):
         self.category_based_split = category_based_split
         self.debug_mode = debug_mode
 
-        # Rehearsal variables
-        self.exemplar_set_ratio = exemplar_set_ratio
-        self.exemplar_set = dict()
-        self.current_set = dict()
+        # Native rehearsal variables
+        self.rm = list()
+        self.rm_size = rehearsal_memory_size
+        self.batches_so_far = 0
+        self.current_batch = list()
 
         self.n_batch = constants.N_BATCH
 
@@ -138,12 +139,6 @@ class CORe50DataLoader(object):
                 int(file_path.split("/o")[1].split("/C")[0].split("/")[0]) - 1
             )
 
-            # Add classes to encountered dict
-            if y[mini_batch_element] not in self.current_set.keys():
-                self.current_set[y[mini_batch_element]] = [self.idx_order[self.idx]]
-            else:
-                self.current_set[y[mini_batch_element]].append(self.idx_order[self.idx])
-
             self.idx += 1
 
         # Don't load images in debug mode
@@ -191,7 +186,7 @@ class CORe50DataLoader(object):
 
         return x
 
-    # Function that randomizes data order
+    # Function that prepares training batch and randomizes data order
     def do_randomization(self):
         # Get current batch ids
         if isinstance(self.batch, list):
@@ -201,9 +196,23 @@ class CORe50DataLoader(object):
         else:
             self.idx_order = list(self.lup[self.scenario][self.run][self.batch])
 
+        # Check batch and exemplar set sizes
+        if self.debug_mode:
+            print()
+            print("Batch report")
+            print("Batch size:", len(self.idx_order))
+            print("Rehearsal memory actual size:", len(self.rm))
+
+        # Store current batch ids
+        self.current_batch = self.idx_order.copy()
+
         # Add exemplar set to id list
-        for key in self.exemplar_set.keys():
-            self.idx_order += self.exemplar_set[key]
+        self.idx_order += self.rm
+
+        # Check final size
+        if self.debug_mode:
+            print("Total size:", len(self.idx_order))
+            print()
 
         # Randomize their order if required
         if self.randomize_data_order:
@@ -233,69 +242,42 @@ class CORe50DataLoader(object):
 
         return None
 
-    def update_exemplar_set(self):
-        # Check current stored exemplar set size
-        total_available = 0
-        for key in self.exemplar_set.keys():
-            total_available += len(self.exemplar_set[key])
-        for key in self.current_set.keys():
-            total_available += len(self.current_set[key])
+    def populate_rm(self):
+        # Compute h
+        h = self.rm_size // (self.batches_so_far + 1)
 
-        if self.exemplar_set_ratio >= 1.0 or total_available <= (
-            self.exemplar_set_ratio * constants.NC_TRAINING_SET_SIZE
-        ):
-            # If enough space left, add all samples from the current batch
-            for key in self.current_set.keys():
-                self.exemplar_set[key] = self.current_set[key]
+        # Treat case of h greater than size of current batch
+        if h > len(self.current_batch):
+            h = len(self.current_batch)
+
+        # Size of rm to be kept
+        n_ext_mem = self.rm_size - h
+
+        # Treat exceptional cases
+        assert n_ext_mem >= 0, "Size of rm should never be negative."
+        assert h <= len(self.current_batch), "Not enough patterns in current batch."
+        assert h <= self.rm_size, "Rehearsal memory size exceeded."
+
+        # Get random h patterns to keep
+        r_add = random.sample(self.current_batch, h)
+
+        # Manipulate patterns in rm as required
+        if self.batches_so_far == 0:
+            self.rm = r_add
         else:
-            # Else, keep equal number of samples for each class
-            # Count all available samples (stored exemplars + current batch)
-            keys_so_far = list()
-            keys_so_far += list(self.exemplar_set.keys())
-            keys_so_far += list(self.current_set.keys())
+            self.rm = random.sample(self.rm, n_ext_mem) + r_add
 
-            # Compute how many samples to store per class
-            samples_per_class = int(
-                (self.exemplar_set_ratio * constants.NC_TRAINING_SET_SIZE)
-                / len(set(keys_so_far))
-            )
+        # Increment batch counter
+        self.batches_so_far += 1
 
-            # Keep the predetermined number of samples from previous exemplars
-            for key in self.exemplar_set.keys():
-                if len(self.exemplar_set[key]) < samples_per_class:
-                    self.exemplar_set[key] = self.exemplar_set[key]
-                else:
-                    self.exemplar_set[key] = random.sample(
-                        self.exemplar_set[key], samples_per_class
-                    )
-
-            # Keep the predetermined number of samples from current batch
-            for key in self.current_set.keys():
-                if len(self.current_set[key]) < samples_per_class:
-                    self.exemplar_set[key] = self.current_set[key]
-                else:
-                    self.exemplar_set[key] = random.sample(
-                        self.current_set[key], samples_per_class
-                    )
-
-        # Reset dictionary of current batch
-        self.current_set = dict()
-
-        # In debug mode, print the number of exemplars stored for each class
+        # In debug mode, check sizes
         if self.debug_mode:
-            total_number_of_samples = 0
-
-            the_keys = list(self.exemplar_set.keys())
-            the_keys.sort()
-
-            print("Total number of keys:", len(the_keys))
-            for el in the_keys:
-                print(el, "-", len(self.exemplar_set[el]))
-                total_number_of_samples += len(self.exemplar_set[el])
-            print("Total number of stored exemplars:", total_number_of_samples)
-            print(
-                "Required maximum number of exemplars:",
-                int(self.exemplar_set_ratio * constants.NC_TRAINING_SET_SIZE),
-            )
+            print()
+            print("Rehearsal report")
+            print("Required:", h)
+            print("To add:", len(r_add))
+            print("Maximum allowed rehearsal memory size:", self.rm_size)
+            print("Actual rehearsal memory size:", len(self.rm))
+            print()
 
         return None

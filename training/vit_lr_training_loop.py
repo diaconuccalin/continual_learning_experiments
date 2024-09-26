@@ -8,7 +8,6 @@ from datasets.core50.constants import (
     CORE50_ROOT_PATH,
     CORE50_CATEGORY_NAMES,
     CORE50_CLASS_NAMES,
-    NEW_TO_OLD_NAMES,
 )
 from models.vit_lr.ResizeProcedure import ResizeProcedure
 from models.vit_lr.ViTLR_model import ViTLR
@@ -22,12 +21,19 @@ def vit_lr_epoch(
     criterion,
     current_epoch,
     total_epochs,
+    current_batch,
     mini_batch_size,
     save_dir_path,
     device,
     profiling_activated,
 ):
     losses_list = list()
+
+    # Set data loader parameters
+    data_loader.update_batch(current_batch)
+    data_loader.idx = 0
+
+    # Determine batch sizes
     batch_len = len(data_loader.idx_order)
     if mini_batch_size < 1 or mini_batch_size > batch_len:
         mini_batch_size = batch_len
@@ -135,6 +141,9 @@ def vit_lr_epoch(
                 loss=sum(losses_list[-mini_batch_size:]) / mini_batch_size
             )
 
+    # Populate rehearsal memory
+    data_loader.populate_rm()
+
     # Save model only when debug mode is not active
     if not data_loader.debug_mode:
         print("\nSaving model...\n")
@@ -162,7 +171,7 @@ def vit_native_rehearsal_training_pipeline(
     current_run,
     num_layers,
     mini_batch_size,
-    exemplar_set_ratio,
+    rehearsal_memory_size,
     device,
     pretrained_weights_path,
     session_name,
@@ -173,7 +182,7 @@ def vit_native_rehearsal_training_pipeline(
     data_loader_debug_mode=False,
 ):
     # Obtain old scenario name
-    current_task = NEW_TO_OLD_NAMES[current_task]
+    current_task = current_task
 
     # Compute number of classes
     if category_based_split:
@@ -191,7 +200,7 @@ def vit_native_rehearsal_training_pipeline(
         image_channels=3,
         scenario=current_task,
         mini_batch_size=1,
-        exemplar_set_ratio=exemplar_set_ratio,
+        rehearsal_memory_size=rehearsal_memory_size,
         start_run=current_run,
         randomize_data_order=randomize_data_order,
         category_based_split=category_based_split,
@@ -277,10 +286,6 @@ def vit_native_rehearsal_training_pipeline(
     print("Starting the training loop...\n")
 
     if epochs_per_batch < 1:
-        # Set data loader parameters
-        data_loader.update_batch(batches)
-        data_loader.idx = 0
-
         # Run epoch
         vit_lr_epoch(
             model=model,
@@ -289,24 +294,18 @@ def vit_native_rehearsal_training_pipeline(
             criterion=criterion,
             current_epoch=1,
             total_epochs=1,
+            current_batch=0,
             mini_batch_size=mini_batch_size,
             save_dir_path=save_path,
             device=device,
             profiling_activated=profiling_activated,
         )
-
-        # Update for rehearsal
-        data_loader.update_exemplar_set()
     else:
         current_epoch = 0
 
         for current_batch in batches:
             for e in range(epochs_per_batch):
                 current_epoch += 1
-
-                # Set data loader parameters
-                data_loader.update_batch(current_batch)
-                data_loader.idx = 0
 
                 # Run epoch
                 vit_lr_epoch(
@@ -316,11 +315,9 @@ def vit_native_rehearsal_training_pipeline(
                     criterion=criterion,
                     current_epoch=current_epoch,
                     total_epochs=epochs_per_batch * len(batches),
+                    current_batch=current_batch,
                     mini_batch_size=mini_batch_size,
                     save_dir_path=save_path,
                     device=device,
                     profiling_activated=profiling_activated,
                 )
-
-                # Update for rehearsal
-                data_loader.update_exemplar_set()
