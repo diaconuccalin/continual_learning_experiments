@@ -217,7 +217,7 @@ class CORe50DataLoader(object):
             )
             self.mini_batch_size = batch_len
         # If not, remove a number of random images from the train set, such that we exactly fill all the mini-batches
-        else:
+        elif self.mini_batch_size != 1:
             self.idx_order = random.sample(
                 self.idx_order,
                 len(self.idx_order) - batch_len % self.mini_batch_size,

@@ -138,6 +138,7 @@ def vit_lr_evaluation_pipeline(
         num_layers=num_layers,
         input_size=input_image_size,
         num_classes=num_classes,
+        dropout_rate=0.0,
     )
 
     # Load stored information
