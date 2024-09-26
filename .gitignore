@@ -165,3 +165,4 @@ cython_debug/
 /datasets/core50/data/
 /weights/
 /logs/
+/evaluation_results/

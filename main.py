@@ -1,14 +1,15 @@
 import argparse
 import os
 
-import numpy as np
 import torch
 
 from datasets.core50.constants import (
     NI_TRAINING_BATCHES,
     NC_TRAINING_BATCHES,
     NIC_CUMULATIVE_TRAINING_BATCHES,
+    CORE50_CATEGORY_NAMES,
 )
+from evaluation.evaluation_utils import plot_confusion_matrix, plot_losses
 from evaluation.vit_lr_evaluation_loop import vit_lr_evaluation_pipeline
 from training.vit_lr_training_loop import (
     vit_native_rehearsal_training_pipeline,
@@ -23,6 +24,11 @@ def create_arg_parser():
     parser.add_argument(
         "pipeline",
         help="The pipeline to be run. One of: vit_lr_naive_finetune, vit_lr_core50_evaluation.",
+    )
+    parser.add_argument(
+        "--current_task",
+        help="The task to be used.",
+        required=True,
     )
     parser.add_argument(
         "--weights_path", help="Path to the trained model weights.", required=False
@@ -51,7 +57,9 @@ def create_arg_parser():
     return parser
 
 
-def vit_demo_naive_finetune():
+def vit_demo_naive_finetune(
+    device, session_name, category_based_split, profiling_activated, current_task
+):
     vit_native_rehearsal_training_pipeline(
         batches=NI_TRAINING_BATCHES,
         epochs_per_batch=10,
@@ -59,7 +67,7 @@ def vit_demo_naive_finetune():
         momentum=0.9,
         l2=0.0005,
         input_image_size=(384, 384),
-        current_task="ni",
+        current_task=current_task,
         current_run=0,
         num_layers=12,
         mini_batch_size=32,
@@ -74,10 +82,10 @@ def vit_demo_naive_finetune():
     )
 
 
-def vit_lr_core50_evaluation():
-    accuracy, conf_mat = vit_lr_evaluation_pipeline(
+def vit_lr_core50_evaluation(device, weights_path, category_based_split, current_task):
+    losses, accuracy, conf_mat = vit_lr_evaluation_pipeline(
         input_image_size=(384, 384),
-        current_task="ni",
+        current_task=current_task,
         current_run=0,
         num_layers=12,
         weights_path=weights_path,
@@ -85,30 +93,53 @@ def vit_lr_core50_evaluation():
         category_based_split=category_based_split,
     )
 
-    # Extract the string up to the file name from weights_path
+    # Prepare accuracy save path
     saving_path_accuracy = weights_path.replace(".pth", "_evaluation_results.txt")
     saving_path_accuracy = saving_path_accuracy.replace(
         "weights/", "evaluation_results/"
     )
 
-    saving_path_conf_mat = weights_path.replace(".pth", "_confusion_matrix.txt")
+    # Prepare confusion matrix save path
+    saving_path_conf_mat = weights_path.replace(".pth", "_confusion_matrix.png")
     saving_path_conf_mat = saving_path_conf_mat.replace(
         "weights/", "evaluation_results/"
     )
 
+    # Prepare losses plot save path
+    saving_path_losses_plot = weights_path.replace(".pth", "_losses.png")
+    saving_path_losses_plot = saving_path_losses_plot.replace(
+        "weights/", "evaluation_results/"
+    )
+
+    # Create directories if they do not exist
     path_split = saving_path_accuracy.split(os.sep)
     for idx in range(len(path_split) - 1):
         if not os.path.exists(os.sep.join(path_split[: idx + 1])):
             os.mkdir(os.sep.join(path_split[: idx + 1]))
 
+    # Write results to files
     with open(saving_path_accuracy, "w") as f:
         f.write("OBTAINED ACCURACY: %0.3f" % (accuracy * 100) + "%\n")
-    np.savetxt(saving_path_conf_mat, conf_mat)
+    plot_confusion_matrix(
+        conf_mat=conf_mat,
+        labels=CORE50_CATEGORY_NAMES,
+        category_based_split=category_based_split,
+        save_location=saving_path_conf_mat,
+    )
+    plot_losses(losses, save_location=saving_path_losses_plot)
 
     print("Evaluation successfully completed!")
 
 
-def vit_rehearsal_train():
+def vit_rehearsal_train(
+    device,
+    exemplar_set_ratio,
+    session_name,
+    category_based_split,
+    profiling_activated,
+    data_loader_debug_mode,
+    current_task,
+):
     vit_native_rehearsal_training_pipeline(
         batches=NC_TRAINING_BATCHES,
         epochs_per_batch=1,
@@ -116,7 +147,7 @@ def vit_rehearsal_train():
         momentum=0.9,
         l2=0.0005,
         input_image_size=(384, 384),
-        current_task="multi-task-nc",
+        current_task=current_task,
         current_run=0,
         num_layers=12,
         mini_batch_size=32,
@@ -132,7 +163,9 @@ def vit_rehearsal_train():
     )
 
 
-def latent_replay_native_cumulative():
+def latent_replay_native_cumulative(
+    device, session_name, profiling_activated, data_loader_debug_mode, current_task
+):
     vit_native_rehearsal_training_pipeline(
         batches=NIC_CUMULATIVE_TRAINING_BATCHES,
         epochs_per_batch=-1,
@@ -140,7 +173,7 @@ def latent_replay_native_cumulative():
         momentum=0.9,
         l2=0.0005,
         input_image_size=(384, 384),
-        current_task="nic",
+        current_task=current_task,
         current_run=0,
         num_layers=12,
         mini_batch_size=128,
@@ -156,7 +189,7 @@ def latent_replay_native_cumulative():
     )
 
 
-if __name__ == "__main__":
+def main():
     # Training constants (temporary implementation)
     category_based_split = False
 
@@ -170,6 +203,7 @@ if __name__ == "__main__":
     profiling_activated = args.profile
     exemplar_set_ratio = float(args.exemplar_set_ratio)
     data_loader_debug_mode = args.data_loader_debug_mode
+    current_task = args.current_task
 
     # Check if pipeline is supported
     assert pipeline in [
@@ -195,10 +229,41 @@ if __name__ == "__main__":
 
     # Run chosen pipeline
     if pipeline == "vit_demo_naive_finetune":
-        vit_demo_naive_finetune()
+        vit_demo_naive_finetune(
+            device=device,
+            session_name=session_name,
+            category_based_split=category_based_split,
+            profiling_activated=profiling_activated,
+            current_task=current_task,
+        )
     elif pipeline == "vit_lr_core50_evaluation":
-        vit_lr_core50_evaluation()
+        vit_lr_core50_evaluation(
+            device=device,
+            weights_path=weights_path,
+            category_based_split=category_based_split,
+            current_task=current_task,
+        )
     elif pipeline == "vit_rehearsal_train":
-        vit_rehearsal_train()
+        vit_rehearsal_train(
+            device=device,
+            exemplar_set_ratio=exemplar_set_ratio,
+            session_name=session_name,
+            category_based_split=category_based_split,
+            profiling_activated=profiling_activated,
+            data_loader_debug_mode=data_loader_debug_mode,
+            current_task=current_task,
+        )
     elif pipeline == "latent_replay_native_cumulative":
-        latent_replay_native_cumulative()
+        latent_replay_native_cumulative(
+            device=device,
+            session_name=session_name,
+            profiling_activated=profiling_activated,
+            data_loader_debug_mode=data_loader_debug_mode,
+            current_task=current_task,
+        )
+
+    return None
+
+
+if __name__ == "__main__":
+    main()

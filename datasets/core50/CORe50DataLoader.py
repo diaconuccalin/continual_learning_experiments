@@ -9,7 +9,7 @@ from PIL import Image
 from datasets.core50 import constants
 from datasets.core50.constants import NEW_TO_OLD_NAMES
 from models.vit_lr.ResizeProcedure import ResizeProcedure
-from models.vit_lr.utils import bordering_resize
+from models.vit_lr.vit_lr_utils import bordering_resize
 
 
 class CORe50DataLoader(object):

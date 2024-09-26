@@ -12,7 +12,7 @@ from datasets.core50.constants import (
 )
 from models.vit_lr.ResizeProcedure import ResizeProcedure
 from models.vit_lr.ViTLR_model import ViTLR
-from models.vit_lr.utils import vit_lr_image_preprocessing
+from models.vit_lr.vit_lr_utils import vit_lr_image_preprocessing
 
 
 def vit_lr_epoch(

@@ -10,10 +10,12 @@ from datasets.core50.constants import (
     CORE50_ROOT_PATH,
     CORE50_CATEGORY_NAMES,
     NI_TESTING_BATCH,
+    NIC_CUMULATIVE_TESTING_BATCH,
+    NC_TESTING_BATCH,
 )
 from models.vit_lr.ResizeProcedure import ResizeProcedure
 from models.vit_lr.ViTLR_model import ViTLR
-from models.vit_lr.utils import bordering_resize, vit_lr_image_preprocessing
+from models.vit_lr.vit_lr_utils import bordering_resize, vit_lr_image_preprocessing
 
 
 def vit_lr_single_evaluation(
@@ -104,6 +106,16 @@ def vit_lr_evaluation_pipeline(
     else:
         num_classes = len(CORE50_CLASS_NAMES)
 
+    # Choose batch
+    if current_task == "ni":
+        batch = NI_TESTING_BATCH
+    elif current_task in ["nc", "multi-task-nc"]:
+        batch = NC_TESTING_BATCH
+    elif current_task in ["nic", "nicv2_391"]:
+        batch = NIC_CUMULATIVE_TESTING_BATCH
+    else:
+        raise ValueError("Invalid task name!")
+
     # Generate data loader
     data_loader = CORe50DataLoader(
         root=CORE50_ROOT_PATH,
@@ -114,9 +126,10 @@ def vit_lr_evaluation_pipeline(
         scenario=current_task,
         mini_batch_size=1,
         start_run=current_run,
-        batch=NI_TESTING_BATCH,
+        batch=batch,
         start_idx=0,
         category_based_split=category_based_split,
+        randomize_data_order=False,
     )
 
     # Prepare model
@@ -127,9 +140,13 @@ def vit_lr_evaluation_pipeline(
         num_classes=num_classes,
     )
 
-    # Load weights
-    print("Loading pretrained weights...")
+    # Load stored information
+    print("Loading pretrained model...")
     weights = torch.load(weights_path, weights_only=False, map_location=device)
+
+    losses = None
+    if "loss" in weights.keys():
+        losses = weights["loss"]
 
     if "model_state_dict" in weights.keys():
         weights = weights["model_state_dict"]
@@ -145,16 +162,14 @@ def vit_lr_evaluation_pipeline(
     # Compute accuracy
     n_correct_preds = 0
     preds_so_far = 0
-    total_samples = (
-        len(data_loader.lup[current_task][current_run][NI_TESTING_BATCH]) - 1
-    )
+    total_samples = len(data_loader.idx_order)
 
     # Store for conf matrix
     all_y_trains = list()
     all_y_preds = list()
 
     # Prepare progress bar
-    progress_bar = tqdm(range(total_samples), colour="yellow", desc="Eval")
+    progress_bar = tqdm(range(total_samples), colour="yellow", desc="Evaluation")
 
     # Iterate through samples
     for _ in progress_bar:
@@ -176,4 +191,8 @@ def vit_lr_evaluation_pipeline(
             f"Accuracy: %0.3f" % (100 * n_correct_preds / preds_so_far) + "%"
         )
 
-    return n_correct_preds / preds_so_far, confusion_matrix(all_y_trains, all_y_preds)
+    return (
+        losses,
+        n_correct_preds / preds_so_far,
+        confusion_matrix(all_y_trains, all_y_preds, labels=range(num_classes)),
+    )
