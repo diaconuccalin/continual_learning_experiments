@@ -46,9 +46,11 @@ def create_arg_parser():
     parser.add_argument(
         "--rehearsal_memory_size",
         "-rm_size",
-        help="Defines the number of patterns to be stored in the rehearsal memory.",
+        help="Defines the number of patterns to be stored in the rehearsal memory. "
+        + "More values can be passed when debugging the data loader using the format val1,val2,val3...",
+        type=lambda arg: list(map(int, arg.split(","))),
         required=False,
-        default=0,
+        default=[0],
     )
     parser.add_argument(
         "--data_loader_debug_mode",
@@ -236,9 +238,15 @@ def main():
     pipeline = args.pipeline
     weights_path = args.weights_path
     profiling_activated = args.profile
-    rehearsal_memory_size = int(args.rehearsal_memory_size)
+    rehearsal_memory_size = args.rehearsal_memory_size
     data_loader_debug_mode = args.data_loader_debug_mode
     current_task = args.current_task
+
+    if not data_loader_debug_mode:
+        assert (
+            len(rehearsal_memory_size) == 1
+        ), "Only one rehearsal memory size can be passed when not debugging the data loader."
+        rehearsal_memory_size = rehearsal_memory_size[0]
 
     # Check if pipeline is supported
     assert pipeline in [
@@ -279,15 +287,23 @@ def main():
             current_task=current_task,
         )
     elif pipeline == "vit_rehearsal_train":
-        vit_rehearsal_train(
-            device=device,
-            rehearsal_memory_size=rehearsal_memory_size,
-            session_name=session_name,
-            category_based_split=category_based_split,
-            profiling_activated=profiling_activated,
-            data_loader_debug_mode=data_loader_debug_mode,
-            current_task=current_task,
-        )
+        if not data_loader_debug_mode:
+            rehearsal_memory_sizes = [
+                rehearsal_memory_size,
+            ]
+        else:
+            rehearsal_memory_sizes = rehearsal_memory_size
+
+        for rehearsal_memory_size in rehearsal_memory_sizes:
+            vit_rehearsal_train(
+                device=device,
+                rehearsal_memory_size=rehearsal_memory_size,
+                session_name=session_name,
+                category_based_split=category_based_split,
+                profiling_activated=profiling_activated,
+                data_loader_debug_mode=data_loader_debug_mode,
+                current_task=current_task,
+            )
     elif pipeline == "latent_replay_native_cumulative":
         latent_replay_native_cumulative(
             device=device,
