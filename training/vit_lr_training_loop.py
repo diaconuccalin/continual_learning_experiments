@@ -515,7 +515,36 @@ def vit_cwr_star_training_pipeline(
 
             past[j] += cur[j]
 
-        print(cur.keys())
-        print(cw)
+        # Save cwr parameters
+        if (
+            not data_loader.debug_mode
+            and model_saving_frequency > 0
+            and (current_epoch % model_saving_frequency == 0)
+        ):
+            print("\nSaving CWR* parameters...\n")
+            torch.save(
+                {
+                    "cw": cw,
+                    "cb": cb,
+                    "cur": cur,
+                    "past": past,
+                    "w_past": w_past,
+                },
+                os.path.join(save_path, "cwr_" + str(current_epoch) + ".pth"),
+            )
+
+    # Update and save final model
+    print("\nSaving final model...\n")
+    model.fc.weight.data = cw
+    model.fc.bias.data = cb
+
+    torch.save(
+        {
+            "epoch": current_epoch,
+            "model_state_dict": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+        },
+        os.path.join(save_path, "final.pth"),
+    )
 
     return None

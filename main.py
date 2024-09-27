@@ -328,7 +328,11 @@ def main():
         )
     elif pipeline == "vit_rehearsal_train":
         for rehearsal_memory_size in rehearsal_memory_sizes:
-            print("Starting training with rm size of", rehearsal_memory_size)
+            print(
+                "--------------- Starting training with rm size of",
+                rehearsal_memory_size,
+                "---------------",
+            )
             vit_rehearsal_train(
                 device=device,
                 rehearsal_memory_size=rehearsal_memory_size,
@@ -348,7 +352,11 @@ def main():
         )
     elif pipeline == "cwr_star_train":
         for rehearsal_memory_size in rehearsal_memory_sizes:
-            print("Starting training with rm size of", rehearsal_memory_size)
+            print(
+                "--------------- Starting training with rm size of",
+                rehearsal_memory_size,
+                "---------------",
+            )
             cwr_star_train(
                 device=device,
                 session_name=session_name + "_rms_" + str(rehearsal_memory_size),
