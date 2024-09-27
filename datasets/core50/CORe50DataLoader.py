@@ -281,3 +281,17 @@ class CORe50DataLoader(object):
             print()
 
         return None
+
+    def get_classes_in_current_batch(self):
+        found_classes = dict()
+        for el in self.idx_order:
+            current_class = (
+                int(self.paths[el].split("/o")[1].split("/C")[0].split("/")[0]) - 1
+            )
+
+            if current_class in found_classes:
+                found_classes[current_class] += 1
+            else:
+                found_classes[current_class] = 1
+
+        return found_classes
