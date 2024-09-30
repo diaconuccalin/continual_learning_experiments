@@ -18,7 +18,7 @@ from training.WeightConstrainingByLRModulation import WeightConstrainingByLRModu
 def vit_lr_epoch(
     model,
     data_loader,
-    optimizers,
+    optimizer,
     criterion,
     current_epoch,
     total_epochs,
@@ -66,8 +66,7 @@ def vit_lr_epoch(
             prof.step()
 
         # Reset gradients
-        for optimizer in optimizers:
-            optimizer.zero_grad()
+        optimizer.zero_grad()
 
         # Prepare gradient accumulator
         grads = list()
@@ -131,8 +130,7 @@ def vit_lr_epoch(
                 el.grad = grads[i] / mini_batch_size
 
         # Update model
-        for optimizer in optimizers:
-            optimizer.step()
+        optimizer.step()
 
         # Update progress bar
         if steps_number > 1:
@@ -153,7 +151,7 @@ def vit_lr_epoch(
             {
                 "epoch": current_epoch,
                 "model_state_dict": model.state_dict(),
-                "optimizers": [optimizer.state_dict() for optimizer in optimizers],
+                "optimizer": optimizer.state_dict(),
                 "loss": losses_list,
             },
             os.path.join(save_dir_path, "checkpoint_e" + str(current_epoch) + ".pth"),
@@ -273,16 +271,14 @@ def vit_native_rehearsal_training_pipeline(
     # Prepare for training
     model.train()
 
-    # Prepare optimizers
-    print("Preparing optimizers and loss function...")
-    optimizers = [
-        torch.optim.SGD(
-            model.parameters(),
-            lr=initial_lr,
-            momentum=momentum,
-            weight_decay=l2,
-        ),
-    ]
+    # Prepare optimizer
+    print("Preparing optimizer and loss function...")
+    optimizer = torch.optim.SGD(
+        model.parameters(),
+        lr=initial_lr,
+        momentum=momentum,
+        weight_decay=l2,
+    )
     criterion = torch.nn.CrossEntropyLoss()
 
     # Iterate through batches and epochs
@@ -297,7 +293,7 @@ def vit_native_rehearsal_training_pipeline(
         vit_lr_epoch(
             model=model,
             data_loader=data_loader,
-            optimizers=optimizers,
+            optimizer=optimizer,
             criterion=criterion,
             current_epoch=1,
             total_epochs=1,
@@ -322,7 +318,7 @@ def vit_native_rehearsal_training_pipeline(
                 vit_lr_epoch(
                     model=model,
                     data_loader=data_loader,
-                    optimizers=optimizers,
+                    optimizer=optimizer,
                     criterion=criterion,
                     current_epoch=current_epoch,
                     total_epochs=epochs_per_batch * len(batches),
@@ -451,16 +447,14 @@ def vit_cwr_star_training_pipeline(
     # Prepare for training
     model.train()
 
-    # Prepare optimizers
-    print("Preparing optimizers and loss function...")
-    optimizers = [
-        torch.optim.SGD(
-            model.parameters(),
-            lr=initial_lr,
-            momentum=momentum,
-            weight_decay=l2,
-        ),
-    ]
+    # Prepare optimizer
+    print("Preparing optimizer and loss function...")
+    optimizer = torch.optim.SGD(
+        model.parameters(),
+        lr=initial_lr,
+        momentum=momentum,
+        weight_decay=l2,
+    )
     criterion = torch.nn.CrossEntropyLoss()
 
     # Iterate through batches and epochs
@@ -496,7 +490,7 @@ def vit_cwr_star_training_pipeline(
         vit_lr_epoch(
             model=model,
             data_loader=data_loader,
-            optimizers=optimizers,
+            optimizer=optimizer,
             criterion=criterion,
             current_epoch=current_epoch,
             total_epochs=epochs_per_batch * len(batches),
@@ -550,7 +544,7 @@ def vit_cwr_star_training_pipeline(
         {
             "epoch": current_epoch,
             "model_state_dict": model.state_dict(),
-            "optimizers": [optimizer.state_dict() for optimizer in optimizers],
+            "optimizer": optimizer.state_dict(),
         },
         os.path.join(save_path, "final.pth"),
     )
@@ -575,6 +569,7 @@ def vit_ar1_star_training_pipeline(
     device,
     pretrained_weights_path,
     session_name,
+    lr_modulation_batch_specific_weights,
     xi=1e-7,
     max_f=0.001,
     model_saving_frequency=1,
@@ -686,37 +681,33 @@ def vit_ar1_star_training_pipeline(
             f_hat[name] = torch.zeros_like(el).to(device)
             f[name] = torch.zeros_like(el).to(device)
 
-    # Prepare optimizers
-    print("Preparing optimizers and loss function...")
+    # Prepare optimizer
+    print("Preparing optimizer and loss function...")
 
     # Separate model parameters
-    backbone_parameters = list()
-    tw_parameters = list()
+    backbone_parameters = dict()
+    tw_parameters = dict()
     for name, param in model.named_parameters():
         if "fc." not in name:
-            backbone_parameters.append(param)
+            backbone_parameters[name] = param
         else:
-            tw_parameters.append(param)
+            tw_parameters[name] = param
 
-    sgd_optimizer = torch.optim.SGD(
-        tw_parameters,
+    optimizer = WeightConstrainingByLRModulation(
+        params=[backbone_parameters, tw_parameters],
+        device=device,
+        w=lr_modulation_batch_specific_weights,
         lr=initial_lr,
         momentum=momentum,
         weight_decay=l2,
     )
-    ar1_optimizer = WeightConstrainingByLRModulation(
-        backbone_parameters,
-        lr=initial_lr,
-    )
-    optimizers = [sgd_optimizer, ar1_optimizer]
-
     criterion = torch.nn.CrossEntropyLoss()
 
     # Iterate through batches and epochs
     print("\nStarting the training loop...\n")
     current_epoch = 0
 
-    for current_batch in batches:
+    for batch_counter, current_batch in enumerate(batches):
         print("\nStarting epoch...\n")
         current_epoch += 1
 
@@ -745,7 +736,7 @@ def vit_ar1_star_training_pipeline(
         vit_lr_epoch(
             model=model,
             data_loader=data_loader,
-            optimizers=optimizers,
+            optimizer=optimizer,
             criterion=criterion,
             current_epoch=current_epoch,
             total_epochs=epochs_per_batch * len(batches),
@@ -778,6 +769,7 @@ def vit_ar1_star_training_pipeline(
             and model_saving_frequency > 0
             and (current_epoch % model_saving_frequency == 0)
         ):
+            # TODO: Save a1_star params
             print("\nSaving CWR* parameters...\n")
             torch.save(
                 {
@@ -791,16 +783,9 @@ def vit_ar1_star_training_pipeline(
             )
 
         # Update ar1* parameters
-        for name, el in model.named_parameters():
-            if name in theta.keys():
-                # Update theta
-                theta[name] = el.data
-
-                # Update f_hat
-                # TODO: Implement total_loss_change and t_k computation
-                # f_hat[name] = total_loss_change[name] / (t_k[name] ** 2 + xi)
-                f[name] += el.data * f_hat[name]
-                torch.clip(input=f[name], max=max_f, out=f_hat[name])
+        optimizer.update_a1_star_params(batch_counter)
+        if True:
+            assert False
 
     # Update and save final model
     print("\nSaving final model...\n")
@@ -811,7 +796,7 @@ def vit_ar1_star_training_pipeline(
         {
             "epoch": current_epoch,
             "model_state_dict": model.state_dict(),
-            "optimizers": [optimizer.state_dict() for optimizer in optimizers],
+            "optimizer": optimizer.state_dict(),
         },
         os.path.join(save_path, "final.pth"),
     )

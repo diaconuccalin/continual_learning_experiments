@@ -11,6 +11,9 @@ from datasets.core50.constants import (
     NI_TESTING_BATCH,
     NC_TESTING_BATCH,
     NIC_CUMULATIVE_TESTING_BATCH,
+    NI_BATCH_SPECIFIC_WEIGHTS,
+    NC_BATCH_SPECIFIC_WEIGHTS,
+    NIC_BATCH_SPECIFIC_WEIGHTS,
 )
 from evaluation.evaluation_utils import plot_confusion_matrix, plot_losses
 from evaluation.vit_lr_evaluation_loop import vit_lr_evaluation_pipeline
@@ -283,10 +286,13 @@ def ar1_star_train(
     # Choose batches
     if current_task == "ni":
         batches = NI_TRAINING_BATCHES
+        lr_modulation_batch_specific_weights = NI_BATCH_SPECIFIC_WEIGHTS
     elif current_task in ["nc", "multi-task-nc"]:
         batches = NC_TRAINING_BATCHES
+        lr_modulation_batch_specific_weights = NC_BATCH_SPECIFIC_WEIGHTS
     elif current_task in ["nic", "nicv2_391"]:
         batches = NIC_CUMULATIVE_TRAINING_BATCHES
+        lr_modulation_batch_specific_weights = NIC_BATCH_SPECIFIC_WEIGHTS
     else:
         raise ValueError("Invalid task name!")
 
@@ -305,6 +311,7 @@ def ar1_star_train(
         device=device,
         pretrained_weights_path="weights/pretrained_imagenet/B_16_imagenet1k.pth",
         session_name=session_name,
+        lr_modulation_batch_specific_weights=lr_modulation_batch_specific_weights,
         model_saving_frequency=40,
         randomize_data_order=True,
         category_based_split=False,
