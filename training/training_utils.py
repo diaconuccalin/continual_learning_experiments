@@ -38,6 +38,10 @@ def sgd_with_lr_modulation(
 
             d_p = buf
 
+        # FIXME
+        # Here it should be in-place
+        # Original: param.add_(d_p, alpha=-lr)
+        # Would give an error: "Leaf variable was used in an in-place operation"
         if f_hat[i] is None:
             params[i] = param - lr * d_p
         else:

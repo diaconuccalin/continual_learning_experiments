@@ -23,6 +23,7 @@ def vit_lr_epoch(
     current_epoch,
     total_epochs,
     mini_batch_size,
+    session_name,
     save_dir_path,
     model_saving_frequency,
     device,
@@ -51,7 +52,9 @@ def vit_lr_epoch(
     if profiling_activated:
         prof = torch.profiler.profile(
             schedule=torch.profiler.schedule(wait=10, warmup=10, active=3, repeat=1),
-            on_trace_ready=torch.profiler.tensorboard_trace_handler("./logs/testing"),
+            on_trace_ready=torch.profiler.tensorboard_trace_handler(
+                os.path.join(".", "logs", session_name)
+            ),
             record_shapes=True,
             profile_memory=True,
             with_stack=True,
@@ -298,6 +301,7 @@ def vit_native_rehearsal_training_pipeline(
             current_epoch=1,
             total_epochs=1,
             mini_batch_size=mini_batch_size,
+            session_name=session_name,
             save_dir_path=save_path,
             model_saving_frequency=model_saving_frequency,
             device=device,
@@ -323,6 +327,7 @@ def vit_native_rehearsal_training_pipeline(
                     current_epoch=current_epoch,
                     total_epochs=epochs_per_batch * len(batches),
                     mini_batch_size=mini_batch_size,
+                    session_name=session_name,
                     save_dir_path=save_path,
                     model_saving_frequency=model_saving_frequency,
                     device=device,
@@ -495,6 +500,7 @@ def vit_cwr_star_training_pipeline(
             current_epoch=current_epoch,
             total_epochs=epochs_per_batch * len(batches),
             mini_batch_size=mini_batch_size,
+            session_name=session_name,
             save_dir_path=save_path,
             model_saving_frequency=model_saving_frequency,
             device=device,
@@ -670,17 +676,6 @@ def vit_ar1_star_training_pipeline(
     # Prepare for training
     model.train()
 
-    # Initialize optimal shared weights and weight importance matrices
-    theta = dict()
-    f_hat = dict()
-    f = dict()
-
-    for name, el in model.named_parameters():
-        if el.requires_grad and "fc." not in name:
-            theta[name] = torch.zeros_like(el).to(device)
-            f_hat[name] = torch.zeros_like(el).to(device)
-            f[name] = torch.zeros_like(el).to(device)
-
     # Prepare optimizer
     print("Preparing optimizer and loss function...")
 
@@ -693,6 +688,7 @@ def vit_ar1_star_training_pipeline(
         else:
             tw_parameters[name] = param
 
+    # FIXME: If replaced with SGD, it works fine
     optimizer = WeightConstrainingByLRModulation(
         params=[backbone_parameters, tw_parameters],
         device=device,
@@ -700,6 +696,8 @@ def vit_ar1_star_training_pipeline(
         lr=initial_lr,
         momentum=momentum,
         weight_decay=l2,
+        max_f=max_f,
+        xi=xi,
     )
     criterion = torch.nn.CrossEntropyLoss()
 
@@ -727,10 +725,7 @@ def vit_ar1_star_training_pipeline(
             model.fc.bias.data[j] = cb[j]
 
         # Freeze backbone if required
-        if current_epoch == 1:
-            model.set_backbone_trainable(True)
-        else:
-            model.set_backbone_trainable(False)
+        model.set_backbone_trainable(True)
 
         # Run epoch
         vit_lr_epoch(
@@ -741,6 +736,7 @@ def vit_ar1_star_training_pipeline(
             current_epoch=current_epoch,
             total_epochs=epochs_per_batch * len(batches),
             mini_batch_size=mini_batch_size,
+            session_name=session_name,
             save_dir_path=save_path,
             model_saving_frequency=model_saving_frequency,
             device=device,
@@ -784,8 +780,6 @@ def vit_ar1_star_training_pipeline(
 
         # Update ar1* parameters
         optimizer.update_a1_star_params(batch_counter)
-        if True:
-            assert False
 
     # Update and save final model
     print("\nSaving final model...\n")
