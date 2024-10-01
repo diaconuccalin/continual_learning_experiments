@@ -12,7 +12,7 @@ from datasets.core50.constants import (
 from models.vit_lr.ResizeProcedure import ResizeProcedure
 from models.vit_lr.ViTLR_model import ViTLR
 from models.vit_lr.vit_lr_utils import vit_lr_image_preprocessing
-from training.WeightConstrainingByLRModulation import WeightConstrainingByLRModulation
+from training.AR1StarSGD import AR1StarSGD
 
 
 def vit_lr_epoch(
@@ -679,20 +679,37 @@ def vit_ar1_star_training_pipeline(
     # Prepare optimizer
     print("Preparing optimizer and loss function...")
 
-    # Separate model parameters
-    backbone_parameters = dict()
-    tw_parameters = dict()
-    for name, param in model.named_parameters():
-        if "fc." not in name:
-            backbone_parameters[name] = param
-        else:
-            tw_parameters[name] = param
+    # Initialize a_star parameters
+    f_hat = list()
+    f = list()
+    sum_l_k = list()
+    t_k = list()
 
-    # FIXME: If replaced with SGD, it works fine
-    optimizer = WeightConstrainingByLRModulation(
-        params=[backbone_parameters, tw_parameters],
-        device=device,
+    for name, param in model.named_parameters():
+        # Required, since in the optimizer, only params with grads will be considered
+        if not param.requires_grad:
+            continue
+
+        if "fc." not in name:
+            # Treat backbone parameters
+            f_hat.append(torch.zeros_like(param).to(device).requires_grad_(False))
+            f.append(torch.zeros_like(param).to(device).requires_grad_(False))
+            sum_l_k.append(torch.zeros_like(param).to(device).requires_grad_(False))
+            t_k.append(torch.zeros_like(param).to(device).requires_grad_(False))
+        else:
+            # Treat head (tw/temporary weights) parameters
+            f_hat.append(None)
+            f.append(None)
+            sum_l_k.append(None)
+            t_k.append(None)
+
+    optimizer = AR1StarSGD(
+        model.parameters(),
         w=lr_modulation_batch_specific_weights,
+        f_hat=f_hat,
+        f=f,
+        sum_l_k=sum_l_k,
+        t_k=t_k,
         lr=initial_lr,
         momentum=momentum,
         weight_decay=l2,
@@ -759,13 +776,15 @@ def vit_ar1_star_training_pipeline(
 
             past[j] += cur[j]
 
+        # Update ar1* parameters
+        optimizer.update_a1_star_params(batch_counter)
+
         # Save cwr parameters
         if (
             not data_loader.debug_mode
             and model_saving_frequency > 0
             and (current_epoch % model_saving_frequency == 0)
         ):
-            # TODO: Save a1_star params
             print("\nSaving CWR* parameters...\n")
             torch.save(
                 {
@@ -778,8 +797,16 @@ def vit_ar1_star_training_pipeline(
                 os.path.join(save_path, "cwr_e" + str(current_epoch) + ".pth"),
             )
 
-        # Update ar1* parameters
-        optimizer.update_a1_star_params(batch_counter)
+            print("\nSaving AR1* parameters...\n")
+            torch.save(
+                {
+                    "f_hat": f_hat,
+                    "f": f,
+                    "sum_l_k": sum_l_k,
+                    "t_k": t_k,
+                },
+                os.path.join(save_path, "ar1_e" + str(current_epoch) + ".pth"),
+            )
 
     # Update and save final model
     print("\nSaving final model...\n")

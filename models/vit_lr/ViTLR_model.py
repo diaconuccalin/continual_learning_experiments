@@ -95,3 +95,6 @@ class ViTLR(nn.Module):
         self.positional_embedding.requires_grad_(trainable)
         self.transformer.requires_grad_(trainable)
         self.norm.requires_grad_(trainable)
+
+        for transformer_block in self.transformer.blocks:
+            transformer_block.attn.proj_out.requires_grad_(False)

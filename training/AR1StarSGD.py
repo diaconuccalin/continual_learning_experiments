@@ -1,15 +1,18 @@
 import torch
-from torch.optim import Optimizer
+from torch.optim.optimizer import Optimizer, _use_grad_for_differentiable
 
 from training.training_utils import sgd_with_lr_modulation
 
 
-class WeightConstrainingByLRModulation(Optimizer):
+class AR1StarSGD(Optimizer):
     def __init__(
         self,
         params,
-        device,
         w,
+        f_hat,
+        f,
+        sum_l_k,
+        t_k,
         lr=0.01,
         momentum=0,
         weight_decay=0,
@@ -29,46 +32,24 @@ class WeightConstrainingByLRModulation(Optimizer):
         self.max_f = max_f
         self.xi = xi
 
-        self.f_hat = list()
-        self.f = list()
-        self.sum_l_k = list()
-        self.t_k = list()
-        all_params = list()
-
-        backbone_params = dict(list(params)[0])
-        for el in backbone_params.keys():
-            all_params.append(backbone_params[el])
-            self.f_hat.append(
-                torch.zeros_like(backbone_params[el]).to(device).requires_grad_(False)
-            )
-            self.f.append(
-                torch.zeros_like(backbone_params[el]).to(device).requires_grad_(False)
-            )
-            self.sum_l_k.append(
-                torch.zeros_like(backbone_params[el]).to(device).requires_grad_(False)
-            )
-            self.t_k.append(
-                torch.zeros_like(backbone_params[el]).to(device).requires_grad_(False)
-            )
-
-        tw_params = dict(list(params)[1])
-        for el in tw_params.keys():
-            all_params.append(tw_params[el])
-            self.f_hat.append(None)
-            self.f.append(None)
-            self.sum_l_k.append(None)
-            self.t_k.append(None)
+        self.f_hat = f_hat
+        self.f = f
+        self.sum_l_k = sum_l_k
+        self.t_k = t_k
 
         # Default optimizer updates
         defaults = dict(
             lr=lr,
             momentum=momentum,
             weight_decay=weight_decay,
+            differentiable=False,
         )
-        super().__init__(all_params, defaults)
+        super().__init__(params, defaults)
 
     def __setstate__(self, state):
         super().__setstate__(state)
+        for group in self.param_groups:
+            group.setdefault("differentiable", False)
 
     def _init_group(self, group, params_with_grad, d_p_list, momentum_buffer_list):
         for p in group["params"]:
@@ -81,6 +62,7 @@ class WeightConstrainingByLRModulation(Optimizer):
 
         return None
 
+    @_use_grad_for_differentiable
     def step(self, closure=None):
         for group in self.param_groups:
             params_with_grad = []
