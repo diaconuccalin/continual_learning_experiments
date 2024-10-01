@@ -98,3 +98,5 @@ class ViTLR(nn.Module):
 
         for transformer_block in self.transformer.blocks:
             transformer_block.attn.proj_out.requires_grad_(False)
+            if transformer_block.attn.proj_out.bias is not None:
+                transformer_block.attn.proj_out.bias.requires_grad_(False)

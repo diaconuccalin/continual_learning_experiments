@@ -3,6 +3,17 @@ from typing import List, Optional
 import torch
 from torch import Tensor
 
+CONSTANT_TRAINING_PARAMETERS = {
+    "epochs_per_batch": 1,
+    "initial_lr": 0.01,
+    "momentum": 0.9,
+    "l2": 0.0005,
+    "input_image_size": (384, 384),
+    "current_run": 0,
+    "num_layers": 12,
+    "pretrained_weights_path": "weights/pretrained_imagenet/B_16_imagenet1k.pth",
+}
+
 
 def sgd_with_lr_modulation(
     params: List[Tensor],
@@ -16,6 +27,10 @@ def sgd_with_lr_modulation(
     lr: float,
     max_f: float,
 ):
+    assert (
+        len(params) == len(d_p_list) == len(f_hat) == len(sum_l_k) == len(t_k)
+    ), "Issue with the AR1* provided parameters! Check their creation in the corresponding training loop."
+
     for i, param in enumerate(params):
         # Prepare AR1* parameters
         initial_param = param.detach().clone().requires_grad_(False)

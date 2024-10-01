@@ -17,11 +17,9 @@ from datasets.core50.constants import (
 )
 from evaluation.evaluation_utils import plot_confusion_matrix, plot_losses
 from evaluation.vit_lr_evaluation_loop import vit_lr_evaluation_pipeline
-from training.vit_lr_training_loops import (
-    vit_native_rehearsal_training_pipeline,
-    vit_cwr_star_training_pipeline,
-    vit_ar1_star_training_pipeline,
-)
+from training.PipelineScenario import PipelineScenario
+from training.training_utils import CONSTANT_TRAINING_PARAMETERS
+from training.vit_lr_training_loops import vit_training_pipeline
 
 
 def create_arg_parser():
@@ -71,26 +69,19 @@ def create_arg_parser():
 def vit_demo_naive_finetune(
     device, session_name, category_based_split, profiling_activated, current_task
 ):
-    vit_native_rehearsal_training_pipeline(
+    vit_training_pipeline(
+        current_scenario=PipelineScenario.NATIVE_REHEARSAL,
         batches=NI_TRAINING_BATCHES,
-        epochs_per_batch=10,
-        initial_lr=0.01,
-        momentum=0.9,
-        l2=0.0005,
-        input_image_size=(384, 384),
         current_task=current_task,
-        current_run=0,
-        num_layers=12,
         mini_batch_size=32,
         rehearsal_memory_size=0,
         device=device,
-        pretrained_weights_path="weights/pretrained_imagenet/B_16_imagenet1k.pth",
         session_name=session_name,
-        model_saving_frequency=1,
         trainable_backbone=True,
         randomize_data_order=True,
         category_based_split=category_based_split,
         profiling_activated=profiling_activated,
+        **CONSTANT_TRAINING_PARAMETERS,
     )
 
 
@@ -173,20 +164,13 @@ def vit_rehearsal_train(
     else:
         raise ValueError("Invalid task name!")
 
-    vit_native_rehearsal_training_pipeline(
+    vit_training_pipeline(
+        current_scenario=PipelineScenario.NATIVE_REHEARSAL,
         batches=batches,
-        epochs_per_batch=1,
-        initial_lr=0.01,
-        momentum=0.9,
-        l2=0.0005,
-        input_image_size=(384, 384),
         current_task=current_task,
-        current_run=0,
-        num_layers=12,
         mini_batch_size=32,
         rehearsal_memory_size=rehearsal_memory_size,
         device=device,
-        pretrained_weights_path="weights/pretrained_imagenet/B_16_imagenet1k.pth",
         session_name=session_name,
         model_saving_frequency=1,
         trainable_backbone=True,
@@ -194,6 +178,7 @@ def vit_rehearsal_train(
         category_based_split=category_based_split,
         profiling_activated=profiling_activated,
         data_loader_debug_mode=data_loader_debug_mode,
+        **CONSTANT_TRAINING_PARAMETERS,
     )
 
 
@@ -210,20 +195,13 @@ def latent_replay_native_cumulative(
     else:
         raise ValueError("Invalid task name!")
 
-    vit_native_rehearsal_training_pipeline(
+    vit_training_pipeline(
+        current_scenario=PipelineScenario.NATIVE_REHEARSAL,
         batches=batches,
-        epochs_per_batch=-1,
-        initial_lr=0.01,
-        momentum=0.9,
-        l2=0.0005,
-        input_image_size=(384, 384),
         current_task=current_task,
-        current_run=0,
-        num_layers=12,
         mini_batch_size=128,
         rehearsal_memory_size=0,
         device=device,
-        pretrained_weights_path="weights/pretrained_imagenet/B_16_imagenet1k.pth",
         session_name=session_name,
         model_saving_frequency=1,
         trainable_backbone=True,
@@ -231,6 +209,7 @@ def latent_replay_native_cumulative(
         category_based_split=False,
         profiling_activated=profiling_activated,
         data_loader_debug_mode=data_loader_debug_mode,
+        **CONSTANT_TRAINING_PARAMETERS,
     )
 
 
@@ -252,26 +231,20 @@ def cwr_star_train(
     else:
         raise ValueError("Invalid task name!")
 
-    vit_cwr_star_training_pipeline(
+    vit_training_pipeline(
+        current_scenario=PipelineScenario.CWR_STAR,
         batches=batches,
-        epochs_per_batch=1,
-        initial_lr=0.01,
-        momentum=0.9,
-        l2=0.0005,
-        input_image_size=(384, 384),
         current_task=current_task,
-        current_run=0,
-        num_layers=12,
         mini_batch_size=128,
         rehearsal_memory_size=rehearsal_memory_size,
         device=device,
-        pretrained_weights_path="weights/pretrained_imagenet/B_16_imagenet1k.pth",
         session_name=session_name,
         model_saving_frequency=40,
         randomize_data_order=True,
         category_based_split=False,
         profiling_activated=profiling_activated,
         data_loader_debug_mode=data_loader_debug_mode,
+        **CONSTANT_TRAINING_PARAMETERS,
     )
 
 
@@ -296,20 +269,13 @@ def ar1_star_train(
     else:
         raise ValueError("Invalid task name!")
 
-    vit_ar1_star_training_pipeline(
+    vit_training_pipeline(
+        current_scenario=PipelineScenario.AR1_STAR,
         batches=batches,
-        epochs_per_batch=1,
-        initial_lr=0.01,
-        momentum=0.9,
-        l2=0.0005,
-        input_image_size=(384, 384),
         current_task=current_task,
-        current_run=0,
-        num_layers=12,
         mini_batch_size=128,
         rehearsal_memory_size=rehearsal_memory_size,
         device=device,
-        pretrained_weights_path="weights/pretrained_imagenet/B_16_imagenet1k.pth",
         session_name=session_name,
         lr_modulation_batch_specific_weights=lr_modulation_batch_specific_weights,
         model_saving_frequency=40,
@@ -317,6 +283,7 @@ def ar1_star_train(
         category_based_split=False,
         profiling_activated=profiling_activated,
         data_loader_debug_mode=data_loader_debug_mode,
+        **CONSTANT_TRAINING_PARAMETERS,
     )
 
 
@@ -337,14 +304,17 @@ def main():
     current_task = args.current_task
 
     # Check if pipeline is supported
-    assert pipeline in [
+    available_pipelines = [
         "vit_demo_naive_finetune",
         "vit_rehearsal_train",
         "vit_lr_core50_evaluation",
         "latent_replay_native_cumulative",
         "cwr_star_train",
         "ar1_star_train",
-    ], "Pipeline currently not supported."
+    ]
+    assert (
+        pipeline in available_pipelines
+    ), "Pipeline currently not supported. Choose one from: " + str(available_pipelines)
 
     # Set seed
     torch.manual_seed(42)
