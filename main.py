@@ -15,6 +15,8 @@ from datasets.core50.constants import (
     NC_BATCH_SPECIFIC_WEIGHTS,
     NIC_BATCH_SPECIFIC_WEIGHTS,
     AR1_STAR_LEARNING_RATES,
+    CWR_STAR_LEARNING_RATES,
+    AR1_STAR_FREE_LEARNING_RATES,
 )
 from evaluation.evaluation_utils import plot_confusion_matrix, plot_losses
 from evaluation.vit_lr_evaluation_loop import vit_lr_evaluation_pipeline
@@ -217,13 +219,14 @@ def latent_replay_native_cumulative(
     )
 
 
-def cwr_star_train(
+def cwr_star_or_ar1_star_free_train(
     device,
     session_name,
     profiling_activated,
     data_loader_debug_mode,
     current_task,
     rehearsal_memory_size,
+    is_cwr_star=True,
 ):
     # Choose batches
     if current_task == "ni":
@@ -236,11 +239,16 @@ def cwr_star_train(
         raise ValueError("Invalid task name!")
 
     vit_training_pipeline(
-        current_scenario=PipelineScenario.CWR_STAR,
+        current_scenario=(
+            PipelineScenario.CWR_STAR if is_cwr_star else PipelineScenario.AR1_STAR_FREE
+        ),
         batches=batches,
         initial_batches=0,
         current_task=current_task,
         mini_batch_size=128,
+        learning_rates=(
+            CWR_STAR_LEARNING_RATES if is_cwr_star else AR1_STAR_FREE_LEARNING_RATES
+        ),
         rehearsal_memory_size=rehearsal_memory_size,
         device=device,
         session_name=session_name,
@@ -318,6 +326,7 @@ def main():
         "latent_replay_native_cumulative",
         "cwr_star_train",
         "ar1_star_train",
+        "ar1_star_free_train",
     ]
     assert (
         pipeline in available_pipelines
@@ -386,13 +395,14 @@ def main():
                 "---------------",
             )
 
-            cwr_star_train(
+            cwr_star_or_ar1_star_free_train(
                 device=device,
                 session_name=session_name + "_rms_" + str(rehearsal_memory_size),
                 profiling_activated=profiling_activated,
                 data_loader_debug_mode=data_loader_debug_mode,
                 current_task=current_task,
                 rehearsal_memory_size=rehearsal_memory_size,
+                is_cwr_star=True,
             )
     elif pipeline == "ar1_star_train":
         for rehearsal_memory_size in rehearsal_memory_sizes:
@@ -409,6 +419,23 @@ def main():
                 data_loader_debug_mode=data_loader_debug_mode,
                 current_task=current_task,
                 rehearsal_memory_size=rehearsal_memory_size,
+            )
+    elif pipeline == "ar1_star_free_train":
+        for rehearsal_memory_size in rehearsal_memory_sizes:
+            print(
+                "--------------- Starting training with rm size of",
+                rehearsal_memory_size,
+                "---------------",
+            )
+
+            cwr_star_or_ar1_star_free_train(
+                device=device,
+                session_name=session_name + "_rms_" + str(rehearsal_memory_size),
+                profiling_activated=profiling_activated,
+                data_loader_debug_mode=data_loader_debug_mode,
+                current_task=current_task,
+                rehearsal_memory_size=rehearsal_memory_size,
+                is_cwr_star=False,
             )
 
     return None

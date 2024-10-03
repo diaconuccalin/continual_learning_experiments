@@ -4,28 +4,39 @@ N_BATCH = {"ni": 8, "nc": 9, "nicv2_391": 391}
 
 CORE50_ROOT_PATH = "datasets/core50/data"
 
+# Batch splits
 NI_TRAINING_BATCHES = list(range(8))
 NI_TESTING_BATCH = 8
+
+NC_TRAINING_BATCHES = list(range(9))
+NC_TESTING_BATCH = 9
+
+NIC_CUMULATIVE_TRAINING_BATCHES = [el for el in range(391) for _ in range(4)]
+NIC_CUMULATIVE_TESTING_BATCH = 391
+
+# AR1* batch-specific weights
 NI_BATCH_SPECIFIC_WEIGHTS = [
     0.00015,
 ] + [0.000005 for _ in range(len(NI_TRAINING_BATCHES) - 1)]
 
-NC_TRAINING_BATCHES = list(range(9))
-NC_TESTING_BATCH = 9
 NC_BATCH_SPECIFIC_WEIGHTS = [
     0.00015,
 ] + [0.000005 for _ in range(len(NC_TRAINING_BATCHES) - 1)]
 
-NIC_CUMULATIVE_TRAINING_BATCHES = [el for el in range(391) for _ in range(4)]
-NIC_CUMULATIVE_TESTING_BATCH = 391
 NIC_BATCH_SPECIFIC_WEIGHTS = [
     0.5,
 ] * len(NIC_CUMULATIVE_TRAINING_BATCHES)
 
-AR1_STAR_LEARNING_RATES = [
-    (0.001, 0.001),
-] * 4 + [(0.0003, 0.003) for _ in range(390) for __ in range(4)]
+# Learning rates
+CWR_STAR_LEARNING_RATES = [(0.001, 0.001)] * 4 + [
+    (0.003, 0.003) for _ in range(390) for __ in range(4)
+]
 
+AR1_STAR_LEARNING_RATES = AR1_STAR_FREE_LEARNING_RATES = [
+    (0.001, 0.001),
+] * 4 + [(0.0003, 0.003) for _ in range(390) for ___ in range(4)]
+
+# Class names
 CORE50_CLASS_NAMES = [
     "adapter1",
     "adapter2",

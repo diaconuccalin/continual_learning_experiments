@@ -17,6 +17,7 @@ CONSTANT_TRAINING_PARAMETERS = {
 def sgd_with_lr_modulation(
     params: List[Tensor],
     d_p_list: List[Tensor],
+    is_backbone: List[bool],
     f_hat: List[Tensor],
     sum_l_k: List[Tensor],
     t_k: List[Tensor],
@@ -28,8 +29,12 @@ def sgd_with_lr_modulation(
     max_f: float,
 ):
     assert (
-        len(params) == len(d_p_list) == len(f_hat) == len(sum_l_k) == len(t_k)
-    ), "Issue with the AR1* provided parameters! Check their creation in the corresponding training loop."
+        len(params) == len(d_p_list) == len(is_backbone)
+    ), "Issue with the optimizer provided parameters! Check their creation in the corresponding training loop."
+    if f_hat is not None:
+        assert (
+            len(params) == len(f_hat) == len(sum_l_k) == len(t_k)
+        ), "Issue with the AR1* optimizer provided parameters! Check their creation in the corresponding training loop."
 
     for i, param in enumerate(params):
         # Prepare AR1* parameters
@@ -53,8 +58,11 @@ def sgd_with_lr_modulation(
 
             d_p = buf
 
-        if f_hat[i] is None:
-            param.add_(d_p, alpha=-head_lr)
+        if f_hat is None or f_hat[i] is None:
+            if is_backbone[i]:
+                param.add_(d_p, alpha=-backbone_lr)
+            else:
+                param.add_(d_p, alpha=-head_lr)
         else:
             param.add_((1 - (f_hat[i] / max_f)) * d_p, alpha=-backbone_lr)
 

@@ -4,16 +4,17 @@ from torch.optim.optimizer import Optimizer, _use_grad_for_differentiable
 from training.training_utils import sgd_with_lr_modulation
 
 
-class AR1StarSGD(Optimizer):
+class CustomSGD(Optimizer):
     def __init__(
         self,
         params,
-        w,
-        f_hat,
-        f,
-        sum_l_k,
-        t_k,
-        lr=0.01,
+        is_backbone,
+        w=None,
+        f_hat=None,
+        f=None,
+        sum_l_k=None,
+        t_k=None,
+        lr=None,
         momentum=0,
         weight_decay=0,
         max_f=0.001,
@@ -24,6 +25,9 @@ class AR1StarSGD(Optimizer):
             raise ValueError(f"Invalid momentum value: {momentum}")
         if weight_decay < 0.0:
             raise ValueError(f"Invalid weight_decay value: {weight_decay}")
+
+        # Store backbone flags
+        self.is_backbone = is_backbone
 
         # Prepare lr modulation parameters
         self.w = w
@@ -73,10 +77,11 @@ class AR1StarSGD(Optimizer):
 
             sgd_with_lr_modulation(
                 params=params_with_grad,
+                d_p_list=d_p_list,
+                is_backbone=self.is_backbone,
+                f_hat=self.f_hat,
                 sum_l_k=self.sum_l_k,
                 t_k=self.t_k,
-                d_p_list=d_p_list,
-                f_hat=self.f_hat,
                 momentum_buffer_list=momentum_buffer_list,
                 weight_decay=group["weight_decay"],
                 momentum=group["momentum"],

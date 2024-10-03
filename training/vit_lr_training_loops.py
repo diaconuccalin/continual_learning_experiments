@@ -12,7 +12,7 @@ from datasets.core50.constants import (
 from models.vit_lr.ResizeProcedure import ResizeProcedure
 from models.vit_lr.ViTLR_model import ViTLR
 from models.vit_lr.vit_lr_utils import vit_lr_image_preprocessing
-from training.AR1StarSGD import AR1StarSGD
+from training.CustomSGD import CustomSGD
 from training.PipelineScenario import PipelineScenario
 
 
@@ -301,9 +301,27 @@ def vit_training_pipeline(
     # Prepare optimizer
     print("Preparing optimizer and loss function...")
 
-    if current_scenario is PipelineScenario.AR1_STAR:
+    # Mark backbone as trainable if required
+    if current_scenario is PipelineScenario.CWR_STAR:
+        model.set_backbone_trainable(False)
+    elif current_scenario in [
+        PipelineScenario.AR1_STAR,
+        PipelineScenario.AR1_STAR_FREE,
+    ]:
         model.set_backbone_trainable(True)
 
+    # Mark backbone trainable parameters
+    is_backbone = list()
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue
+
+        if "fc." not in name:
+            is_backbone.append(True)
+        else:
+            is_backbone.append(False)
+
+    if current_scenario is PipelineScenario.AR1_STAR:
         # Initialize a_star parameters
         f_hat = list()
         f = list()
@@ -328,8 +346,9 @@ def vit_training_pipeline(
                 sum_l_k.append(None)
                 t_k.append(None)
 
-        optimizer = AR1StarSGD(
+        optimizer = CustomSGD(
             model.parameters(),
+            is_backbone=is_backbone,
             w=lr_modulation_batch_specific_weights,
             f_hat=f_hat,
             f=f,
@@ -342,20 +361,18 @@ def vit_training_pipeline(
             xi=xi,
         )
     else:
-        if current_scenario is PipelineScenario.AR1_STAR_FREE:
-            model.set_backbone_trainable(True)
-
-        optimizer = torch.optim.SGD(
-            model.parameters(),
-            lr=learning_rates,
-            momentum=momentum,
-            weight_decay=l2,
-        )
-
         f_hat = None
         f = None
         sum_l_k = None
         t_k = None
+
+        optimizer = CustomSGD(
+            model.parameters(),
+            is_backbone=is_backbone,
+            lr=learning_rates,
+            momentum=momentum,
+            weight_decay=l2,
+        )
 
     criterion = torch.nn.CrossEntropyLoss()
 
@@ -414,7 +431,10 @@ def vit_training_pipeline(
                             model.set_backbone_trainable(True)
                         else:
                             model.set_backbone_trainable(False)
-                    else:
+                    elif current_scenario in [
+                        PipelineScenario.AR1_STAR,
+                        PipelineScenario.AR1_STAR_FREE,
+                    ]:
                         model.set_backbone_trainable(True)
                 else:
                     cur = None
