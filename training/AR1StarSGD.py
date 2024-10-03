@@ -20,8 +20,6 @@ class AR1StarSGD(Optimizer):
         xi=1e-7,
     ):
         # Verify passed values
-        if lr < 0.0:
-            raise ValueError(f"Invalid learning rate: {lr}")
         if momentum < 0.0:
             raise ValueError(f"Invalid momentum value: {momentum}")
         if weight_decay < 0.0:
@@ -36,6 +34,8 @@ class AR1StarSGD(Optimizer):
         self.f = f
         self.sum_l_k = sum_l_k
         self.t_k = t_k
+
+        self.steps_so_far = 0
 
         # Default optimizer updates
         defaults = dict(
@@ -80,9 +80,12 @@ class AR1StarSGD(Optimizer):
                 momentum_buffer_list=momentum_buffer_list,
                 weight_decay=group["weight_decay"],
                 momentum=group["momentum"],
-                lr=group["lr"],
+                backbone_lr=group["lr"][self.steps_so_far][0],
+                head_lr=group["lr"][self.steps_so_far][1],
                 max_f=self.max_f,
             )
+
+            self.steps_so_far += 1
 
             for p, momentum_buffer in zip(params_with_grad, momentum_buffer_list):
                 state = self.state[p]

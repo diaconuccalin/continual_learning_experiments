@@ -14,6 +14,7 @@ from datasets.core50.constants import (
     NI_BATCH_SPECIFIC_WEIGHTS,
     NC_BATCH_SPECIFIC_WEIGHTS,
     NIC_BATCH_SPECIFIC_WEIGHTS,
+    AR1_STAR_LEARNING_RATES,
 )
 from evaluation.evaluation_utils import plot_confusion_matrix, plot_losses
 from evaluation.vit_lr_evaluation_loop import vit_lr_evaluation_pipeline
@@ -274,6 +275,7 @@ def ar1_star_train(
         batches=batches,
         current_task=current_task,
         mini_batch_size=128,
+        learning_rates=AR1_STAR_LEARNING_RATES,
         rehearsal_memory_size=rehearsal_memory_size,
         device=device,
         session_name=session_name,

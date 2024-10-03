@@ -5,7 +5,6 @@ from torch import Tensor
 
 CONSTANT_TRAINING_PARAMETERS = {
     "epochs_per_batch": 1,
-    "initial_lr": 0.01,
     "momentum": 0.9,
     "l2": 0.0005,
     "input_image_size": (384, 384),
@@ -24,7 +23,8 @@ def sgd_with_lr_modulation(
     momentum_buffer_list: List[Optional[Tensor]],
     weight_decay: float,
     momentum: float,
-    lr: float,
+    backbone_lr: float,
+    head_lr: float,
     max_f: float,
 ):
     assert (
@@ -54,9 +54,9 @@ def sgd_with_lr_modulation(
             d_p = buf
 
         if f_hat[i] is None:
-            param.add_(d_p, alpha=-lr)
+            param.add_(d_p, alpha=-head_lr)
         else:
-            param.add_((1 - (f_hat[i] / max_f)) * d_p, alpha=-lr)
+            param.add_((1 - (f_hat[i] / max_f)) * d_p, alpha=-backbone_lr)
 
             # Do necessary updates for AR1*
             sum_l_k[i] += (initial_param - params[i]) * initial_d_p

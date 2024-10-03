@@ -16,11 +16,15 @@ NC_BATCH_SPECIFIC_WEIGHTS = [
     0.00015,
 ] + [0.000005 for _ in range(len(NC_TRAINING_BATCHES) - 1)]
 
-NIC_CUMULATIVE_TRAINING_BATCHES = list(range(391))
+NIC_CUMULATIVE_TRAINING_BATCHES = [el for el in range(391) for _ in range(4)]
 NIC_CUMULATIVE_TESTING_BATCH = 391
 NIC_BATCH_SPECIFIC_WEIGHTS = [
-    0.00015,
-] + [0.000005 for _ in range(len(NIC_CUMULATIVE_TRAINING_BATCHES) - 1)]
+    0.5,
+] * len(NIC_CUMULATIVE_TRAINING_BATCHES)
+
+AR1_STAR_LEARNING_RATES = [
+    (0.001, 0.001),
+] * 4 + [(0.0003, 0.003) for _ in range(390) for __ in range(4)]
 
 CORE50_CLASS_NAMES = [
     "adapter1",

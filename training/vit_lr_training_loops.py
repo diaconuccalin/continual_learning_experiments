@@ -169,7 +169,7 @@ def vit_training_pipeline(
     # If value set to anything lower than 1, the training loop will run for 1 epoch
     # over all the batches considered as a single batch
     epochs_per_batch,
-    initial_lr,
+    learning_rates,
     momentum,
     l2,
     input_image_size,
@@ -329,7 +329,7 @@ def vit_training_pipeline(
             f=f,
             sum_l_k=sum_l_k,
             t_k=t_k,
-            lr=initial_lr,
+            lr=learning_rates,
             momentum=momentum,
             weight_decay=l2,
             max_f=max_f,
@@ -338,7 +338,7 @@ def vit_training_pipeline(
     else:
         optimizer = torch.optim.SGD(
             model.parameters(),
-            lr=initial_lr,
+            lr=learning_rates,
             momentum=momentum,
             weight_decay=l2,
         )
