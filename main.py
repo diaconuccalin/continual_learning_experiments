@@ -67,6 +67,14 @@ def create_arg_parser():
         default=[0],
     )
     parser.add_argument(
+        "--do_validation",
+        "-val",
+        help="Activates validation step after each epoch, defaults to False.",
+        action="store_true",
+        required=False,
+        default=False,
+    )
+    parser.add_argument(
         "--data_loader_debug_mode",
         help="Activates the data loader debug mode, defaults to False.",
         action="store_true",
@@ -78,7 +86,12 @@ def create_arg_parser():
 
 
 def vit_demo_naive_finetune(
-    device, session_name, category_based_split, profiling_activated, current_task
+    device,
+    session_name,
+    category_based_split,
+    profiling_activated,
+    current_task,
+    should_validate,
 ):
     vit_training_pipeline(
         current_scenario=PipelineScenario.NATIVE_REHEARSAL,
@@ -93,6 +106,8 @@ def vit_demo_naive_finetune(
         randomize_data_order=True,
         category_based_split=category_based_split,
         profiling_activated=profiling_activated,
+        should_validate=should_validate,
+        validation_batch=NI_TESTING_BATCH,
         **CONSTANT_TRAINING_PARAMETERS,
     )
 
@@ -164,14 +179,18 @@ def native_cumulative(
     data_loader_debug_mode,
     current_task,
     runs,
+    should_validate=False,
 ):
     # Choose batches
     if current_task == "ni":
         batches = NI_TRAINING_BATCHES
+        validation_batch = NI_TESTING_BATCH
     elif current_task in ["nc", "multi-task-nc"]:
         batches = NC_TRAINING_BATCHES
+        validation_batch = NC_TESTING_BATCH
     elif current_task in ["nic", "nicv2_391"]:
         batches = NIC_CUMULATIVE_TRAINING_BATCHES
+        validation_batch = NIC_CUMULATIVE_TESTING_BATCH
     else:
         raise ValueError("Invalid task name!")
 
@@ -198,6 +217,8 @@ def native_cumulative(
             category_based_split=False,
             profiling_activated=profiling_activated,
             data_loader_debug_mode=data_loader_debug_mode,
+            should_validate=should_validate,
+            validation_batch=validation_batch,
             **CONSTANT_TRAINING_PARAMETERS,
         )
 
@@ -211,14 +232,18 @@ def cwr_star_or_ar1_star_free_train(
     runs,
     rehearsal_memory_size,
     is_cwr_star=True,
+    should_validate=False,
 ):
     # Choose batches
     if current_task == "ni":
         batches = NI_TRAINING_BATCHES
+        validation_batch = NI_TESTING_BATCH
     elif current_task in ["nc", "multi-task-nc"]:
         batches = NC_TRAINING_BATCHES
+        validation_batch = NC_TESTING_BATCH
     elif current_task in ["nic", "nicv2_391"]:
         batches = NIC_CUMULATIVE_TRAINING_BATCHES
+        validation_batch = NIC_CUMULATIVE_TESTING_BATCH
     else:
         raise ValueError("Invalid task name!")
 
@@ -236,7 +261,7 @@ def cwr_star_or_ar1_star_free_train(
                 else PipelineScenario.AR1_STAR_FREE
             ),
             batches=batches,
-            initial_batches=0,
+            initial_batches=[0, 1, 2, 3],
             current_task=current_task,
             current_run=current_run,
             mini_batch_size=128,
@@ -251,6 +276,8 @@ def cwr_star_or_ar1_star_free_train(
             category_based_split=False,
             profiling_activated=profiling_activated,
             data_loader_debug_mode=data_loader_debug_mode,
+            should_validate=should_validate,
+            validation_batch=validation_batch,
             **CONSTANT_TRAINING_PARAMETERS,
         )
 
@@ -263,16 +290,20 @@ def ar1_star_train(
     current_task,
     runs,
     rehearsal_memory_size,
+    should_validate=False,
 ):
     # Choose batches
     if current_task == "ni":
         batches = NI_TRAINING_BATCHES
+        validation_batch = NI_TESTING_BATCH
         lr_modulation_batch_specific_weights = NI_BATCH_SPECIFIC_WEIGHTS
     elif current_task in ["nc", "multi-task-nc"]:
         batches = NC_TRAINING_BATCHES
+        validation_batch = NC_TESTING_BATCH
         lr_modulation_batch_specific_weights = NC_BATCH_SPECIFIC_WEIGHTS
     elif current_task in ["nic", "nicv2_391"]:
         batches = NIC_CUMULATIVE_TRAINING_BATCHES
+        validation_batch = NIC_CUMULATIVE_TESTING_BATCH
         lr_modulation_batch_specific_weights = NIC_BATCH_SPECIFIC_WEIGHTS
     else:
         raise ValueError("Invalid task name!")
@@ -300,6 +331,8 @@ def ar1_star_train(
             category_based_split=False,
             profiling_activated=profiling_activated,
             data_loader_debug_mode=data_loader_debug_mode,
+            should_validate=should_validate,
+            validation_batch=validation_batch,
             **CONSTANT_TRAINING_PARAMETERS,
         )
 
@@ -318,6 +351,7 @@ def main():
     profiling_activated = args.profile
     rehearsal_memory_sizes = args.rehearsal_memory_size
     runs = args.runs
+    do_validation = args.do_validation
     data_loader_debug_mode = args.data_loader_debug_mode
     current_task = args.current_task
 
@@ -356,6 +390,7 @@ def main():
             category_based_split=category_based_split,
             profiling_activated=profiling_activated,
             current_task=current_task,
+            should_validate=do_validation,
         )
     elif pipeline == "vit_lr_core50_evaluation":
         vit_lr_core50_evaluation(
@@ -372,6 +407,7 @@ def main():
             data_loader_debug_mode=data_loader_debug_mode,
             current_task=current_task,
             runs=runs,
+            should_validate=do_validation,
         )
     elif pipeline == "cwr_star_train":
         for rehearsal_memory_size in rehearsal_memory_sizes:
@@ -393,6 +429,7 @@ def main():
                 runs=runs,
                 rehearsal_memory_size=rehearsal_memory_size,
                 is_cwr_star=True,
+                should_validate=do_validation,
             )
     elif pipeline == "ar1_star_train":
         for rehearsal_memory_size in rehearsal_memory_sizes:
@@ -410,6 +447,7 @@ def main():
                 current_task=current_task,
                 runs=runs,
                 rehearsal_memory_size=rehearsal_memory_size,
+                should_validate=do_validation,
             )
     elif pipeline == "ar1_star_free_train":
         for rehearsal_memory_size in rehearsal_memory_sizes:
@@ -428,6 +466,7 @@ def main():
                 runs=runs,
                 rehearsal_memory_size=rehearsal_memory_size,
                 is_cwr_star=False,
+                should_validate=do_validation,
             )
 
     return None

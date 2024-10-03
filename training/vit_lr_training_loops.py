@@ -9,6 +9,8 @@ from datasets.core50.constants import (
     CORE50_CATEGORY_NAMES,
     CORE50_CLASS_NAMES,
 )
+from evaluation.evaluation_utils import plot_confusion_matrix
+from evaluation.vit_lr_evaluation_loop import vit_lr_evaluation_pipeline
 from models.vit_lr.ResizeProcedure import ResizeProcedure
 from models.vit_lr.ViTLR_model import ViTLR
 from models.vit_lr.vit_lr_utils import vit_lr_image_preprocessing
@@ -27,10 +29,21 @@ def vit_lr_epoch(
     session_name,
     save_dir_path,
     model_saving_frequency,
+    current_run,
+    num_layers,
+    category_based_split,
     device,
     profiling_activated,
+    should_validate=False,
+    validation_batch=None,
 ):
     losses_list = list()
+
+    # Check that validation batch is provided if needed
+    if should_validate:
+        assert (
+            validation_batch is not None
+        ), "Validation batch must be provided when validation step is required."
 
     # Determine batch sizes
     batch_len = len(data_loader.idx_order)
@@ -163,6 +176,29 @@ def vit_lr_epoch(
             os.path.join(save_dir_path, "checkpoint_e" + str(current_epoch) + ".pth"),
         )
 
+    # Validate if required
+    if should_validate:
+        _, acc, conf_mat = vit_lr_evaluation_pipeline(
+            batch=validation_batch,
+            input_image_size=data_loader.input_image_size,
+            current_task=data_loader.scenario,
+            current_run=current_run,
+            num_layers=num_layers,
+            category_based_split=category_based_split,
+            device=device,
+            model=model,
+        )
+
+        plot_confusion_matrix(
+            conf_mat=conf_mat,
+            labels=CORE50_CATEGORY_NAMES,
+            category_based_split=category_based_split,
+            save_location=os.path.join(
+                save_dir_path,
+                "validation_confusion_matrix_e" + str(current_epoch) + ".png",
+            ),
+        )
+
 
 def vit_training_pipeline(
     batches,
@@ -192,6 +228,8 @@ def vit_training_pipeline(
     category_based_split=False,
     profiling_activated=False,
     data_loader_debug_mode=False,
+    should_validate=False,
+    validation_batch=None,
 ):
     # Check that batch-specific weights are provided when dealing with AR1*
     if current_scenario is PipelineScenario.AR1_STAR:
@@ -397,8 +435,13 @@ def vit_training_pipeline(
             session_name=session_name,
             save_dir_path=save_path,
             model_saving_frequency=model_saving_frequency,
+            current_run=current_run,
+            num_layers=num_layers,
+            category_based_split=category_based_split,
             device=device,
             profiling_activated=profiling_activated,
+            should_validate=should_validate,
+            validation_batch=validation_batch,
         )
     else:
         for batch_counter, current_batch in enumerate(batches):
@@ -451,8 +494,13 @@ def vit_training_pipeline(
                     session_name=session_name,
                     save_dir_path=save_path,
                     model_saving_frequency=model_saving_frequency,
+                    current_run=current_run,
+                    num_layers=num_layers,
+                    category_based_split=category_based_split,
                     device=device,
                     profiling_activated=profiling_activated,
+                    should_validate=should_validate,
+                    validation_batch=validation_batch,
                 )
 
                 if current_scenario in [

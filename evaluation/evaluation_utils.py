@@ -23,10 +23,12 @@ def plot_confusion_matrix(conf_mat, labels, category_based_split, save_location)
     fig, ax = plt.subplots()
 
     # Plot confusion matrix
-    res = ax.matshow(conf_mat, cmap="Greens", vmin=0, vmax=1)
+    res = ax.matshow(conf_mat, cmap="Greens")
 
     # Show colorbar
-    fig.colorbar(res, shrink=0.7, pad=0.1)
+    fig.subplots_adjust(right=2.0)
+    cb = fig.colorbar(res, shrink=0.7, pad=0.05)
+    cb.set_ticks([])
 
     # Show grid between categories
     ax.set_xticks(np.arange(-0.5, num_classes + 0.5, step), minor=True)
