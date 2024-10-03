@@ -264,7 +264,11 @@ def vit_training_pipeline(
     weights["fc.weight"] = model.fc.weight.data
     weights["fc.bias"] = model.fc.bias.data
 
-    if current_scenario in [PipelineScenario.CWR_STAR, PipelineScenario.AR1_STAR]:
+    if current_scenario in [
+        PipelineScenario.CWR_STAR,
+        PipelineScenario.AR1_STAR,
+        PipelineScenario.AR1_STAR_FREE,
+    ]:
         # Prepare consolidated weights (and biases) tensors and other required variables
         cw = torch.zeros(model.fc.weight.shape).to(device)
         cb = torch.zeros(model.fc.bias.shape).to(device)
@@ -338,6 +342,9 @@ def vit_training_pipeline(
             xi=xi,
         )
     else:
+        if current_scenario is PipelineScenario.AR1_STAR_FREE:
+            model.set_backbone_trainable(True)
+
         optimizer = torch.optim.SGD(
             model.parameters(),
             lr=learning_rates,
@@ -388,6 +395,7 @@ def vit_training_pipeline(
                 if current_scenario in [
                     PipelineScenario.CWR_STAR,
                     PipelineScenario.AR1_STAR,
+                    PipelineScenario.AR1_STAR_FREE,
                 ]:
                     # Find classes occurring in the current batch (and their occurrence count)
                     cur = data_loader.get_classes_in_current_batch()
@@ -430,6 +438,7 @@ def vit_training_pipeline(
                 if current_scenario in [
                     PipelineScenario.CWR_STAR,
                     PipelineScenario.AR1_STAR,
+                    PipelineScenario.AR1_STAR_FREE,
                 ]:
                     print("\nUpdating consolidated weights...\n")
                     # Update consolidated weights
@@ -494,6 +503,7 @@ def vit_training_pipeline(
     if current_scenario in [
         PipelineScenario.CWR_STAR,
         PipelineScenario.AR1_STAR,
+        PipelineScenario.AR1_STAR_FREE,
     ]:
         model.fc.weight.data = cw
         model.fc.bias.data = cb
