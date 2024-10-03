@@ -23,12 +23,15 @@ def plot_confusion_matrix(conf_mat, labels, category_based_split, save_location)
     fig, ax = plt.subplots()
 
     # Plot confusion matrix
-    ax.matshow(conf_mat)
+    res = ax.matshow(conf_mat, cmap="Greens", vmin=0, vmax=1)
+
+    # Show colorbar
+    fig.colorbar(res, shrink=0.7, pad=0.1)
 
     # Show grid between categories
     ax.set_xticks(np.arange(-0.5, num_classes + 0.5, step), minor=True)
     ax.set_yticks(np.arange(-0.5, num_classes + 0.5, step), minor=True)
-    ax.grid(which="minor", color="w", linestyle="-")
+    ax.grid(which="minor", color="gainsboro", linestyle="-")
 
     # Hide default ticks
     plt.tick_params(
@@ -43,6 +46,11 @@ def plot_confusion_matrix(conf_mat, labels, category_based_split, save_location)
         labelleft=False,
         labelright=False,
     )
+
+    # Write true/predicted axis labels on right and bottom
+    ax.set_xlabel("Predicted")
+    ax.yaxis.set_label_position("right")
+    ax.set_ylabel("True")
 
     # Write category labels
     for i in range(0, num_classes, step):
@@ -64,6 +72,9 @@ def plot_confusion_matrix(conf_mat, labels, category_based_split, save_location)
             va="center",
             color="black",
         )
+
+    # Add title at bottom
+    plt.title("Confusion matrix", y=-0.19)
 
     # Make sure nothing of the plot is cut off
     plt.tight_layout()
