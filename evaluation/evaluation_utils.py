@@ -84,6 +84,10 @@ def plot_confusion_matrix(conf_mat, labels, category_based_split, save_location)
 
 
 def plot_losses(losses, save_location):
+    # Check if losses are available
+    if losses is None:
+        return None
+
     # Reset plot
     plt.clf()
 
