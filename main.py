@@ -73,6 +73,7 @@ def vit_demo_naive_finetune(
     vit_training_pipeline(
         current_scenario=PipelineScenario.NATIVE_REHEARSAL,
         batches=NI_TRAINING_BATCHES,
+        initial_batches=0,
         current_task=current_task,
         mini_batch_size=32,
         rehearsal_memory_size=0,
@@ -168,6 +169,7 @@ def vit_rehearsal_train(
     vit_training_pipeline(
         current_scenario=PipelineScenario.NATIVE_REHEARSAL,
         batches=batches,
+        initial_batches=0,
         current_task=current_task,
         mini_batch_size=32,
         rehearsal_memory_size=rehearsal_memory_size,
@@ -199,6 +201,7 @@ def latent_replay_native_cumulative(
     vit_training_pipeline(
         current_scenario=PipelineScenario.NATIVE_REHEARSAL,
         batches=batches,
+        initial_batches=0,
         current_task=current_task,
         mini_batch_size=128,
         rehearsal_memory_size=0,
@@ -235,6 +238,7 @@ def cwr_star_train(
     vit_training_pipeline(
         current_scenario=PipelineScenario.CWR_STAR,
         batches=batches,
+        initial_batches=0,
         current_task=current_task,
         mini_batch_size=128,
         rehearsal_memory_size=rehearsal_memory_size,
@@ -273,6 +277,7 @@ def ar1_star_train(
     vit_training_pipeline(
         current_scenario=PipelineScenario.AR1_STAR,
         batches=batches,
+        initial_batches=[0, 1, 2, 3],
         current_task=current_task,
         mini_batch_size=128,
         learning_rates=AR1_STAR_LEARNING_RATES,

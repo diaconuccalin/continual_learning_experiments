@@ -166,6 +166,7 @@ def vit_lr_epoch(
 
 def vit_training_pipeline(
     batches,
+    initial_batches,
     # If value set to anything lower than 1, the training loop will run for 1 epoch
     # over all the batches considered as a single batch
     epochs_per_batch,
@@ -216,6 +217,7 @@ def vit_training_pipeline(
         mini_batch_size=1,
         rehearsal_memory_size=rehearsal_memory_size,
         batch=batches[0],
+        initial_batches=initial_batches,
         start_run=current_run,
         randomize_data_order=randomize_data_order,
         category_based_split=category_based_split,

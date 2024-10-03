@@ -27,6 +27,7 @@ class CORe50DataLoader(object):
         batch: int = 0,
         start_run: int = 0,
         start_idx: int = 0,
+        initial_batches: list = None,
         randomize_data_order: bool = False,
         # If False, use the default 50 classes; if True, use the 10 categories,
         # by mapping each 5 classes into the corresponding category
@@ -74,6 +75,7 @@ class CORe50DataLoader(object):
         self.rm = list()
         self.rm_size = rehearsal_memory_size
         self.batches_so_far = 0
+        self.initial_batches = initial_batches
         self.current_batch = list()
 
         self.n_batch = constants.N_BATCH
@@ -262,7 +264,7 @@ class CORe50DataLoader(object):
         r_add = random.sample(self.current_batch, h)
 
         # Manipulate patterns in rm as required
-        if self.batches_so_far == 0:
+        if self.batches_so_far in self.initial_batches:
             self.rm = r_add
         else:
             self.rm = random.sample(self.rm, n_ext_mem) + r_add
