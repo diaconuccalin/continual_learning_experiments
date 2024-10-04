@@ -150,6 +150,7 @@ def vit_lr_epoch(
                 el.grad = grads[i] / mini_batch_size
 
         # Update model
+        optimizer.current_epoch = current_epoch - 1
         optimizer.step()
 
         # Update progress bar

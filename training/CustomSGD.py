@@ -39,7 +39,7 @@ class CustomSGD(Optimizer):
         self.sum_l_k = sum_l_k
         self.t_k = t_k
 
-        self.steps_so_far = 0
+        self.current_epoch = 0
 
         # Default optimizer updates
         defaults = dict(
@@ -85,12 +85,10 @@ class CustomSGD(Optimizer):
                 momentum_buffer_list=momentum_buffer_list,
                 weight_decay=group["weight_decay"],
                 momentum=group["momentum"],
-                backbone_lr=group["lr"][self.steps_so_far][0],
-                head_lr=group["lr"][self.steps_so_far][1],
+                backbone_lr=group["lr"][self.current_epoch][0],
+                head_lr=group["lr"][self.current_epoch][1],
                 max_f=self.max_f,
             )
-
-            self.steps_so_far += 1
 
             for p, momentum_buffer in zip(params_with_grad, momentum_buffer_list):
                 state = self.state[p]
