@@ -36,6 +36,13 @@ AR1_STAR_LEARNING_RATES = AR1_STAR_FREE_LEARNING_RATES = [
     (0.001, 0.001),
 ] * 4 + [(0.0003, 0.003) for _ in range(390) for ___ in range(4)]
 
+# Epochs in which to apply rehearsal-specific rm populate
+NI_POPULATE_RM_EPOCHS = NI_TRAINING_BATCHES
+NC_POPULATE_RM_EPOCHS = NC_TRAINING_BATCHES
+NIC_POPULATE_RM_EPOCHS = [
+    el for el in range(4, len(NIC_CUMULATIVE_TRAINING_BATCHES), 4)
+]
+
 # Class names
 CORE50_CLASS_NAMES = [
     "adapter1",

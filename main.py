@@ -17,6 +17,9 @@ from datasets.core50.constants import (
     AR1_STAR_LEARNING_RATES,
     CWR_STAR_LEARNING_RATES,
     AR1_STAR_FREE_LEARNING_RATES,
+    NI_POPULATE_RM_EPOCHS,
+    NC_POPULATE_RM_EPOCHS,
+    NIC_POPULATE_RM_EPOCHS,
 )
 from evaluation.evaluation_utils import plot_confusion_matrix, plot_losses
 from evaluation.vit_lr_evaluation_loop import vit_lr_evaluation_pipeline
@@ -96,6 +99,7 @@ def vit_demo_naive_finetune(
     vit_training_pipeline(
         current_scenario=PipelineScenario.NATIVE_REHEARSAL,
         batches=NI_TRAINING_BATCHES,
+        populate_rm_epochs=NI_POPULATE_RM_EPOCHS,
         initial_batches=0,
         current_task=current_task,
         mini_batch_size=32,
@@ -185,12 +189,15 @@ def native_cumulative(
     if current_task == "ni":
         batches = NI_TRAINING_BATCHES
         validation_batch = NI_TESTING_BATCH
+        populate_rm_batches = NI_POPULATE_RM_EPOCHS
     elif current_task in ["nc", "multi-task-nc"]:
         batches = NC_TRAINING_BATCHES
         validation_batch = NC_TESTING_BATCH
+        populate_rm_batches = NC_POPULATE_RM_EPOCHS
     elif current_task in ["nic", "nicv2_391"]:
         batches = NIC_CUMULATIVE_TRAINING_BATCHES
         validation_batch = NIC_CUMULATIVE_TESTING_BATCH
+        populate_rm_batches = NIC_POPULATE_RM_EPOCHS
     else:
         raise ValueError("Invalid task name!")
 
@@ -208,6 +215,7 @@ def native_cumulative(
             current_task=current_task,
             mini_batch_size=128,
             rehearsal_memory_size=0,
+            populate_rm_epochs=populate_rm_batches,
             device=device,
             current_run=current_run,
             session_name=session_name + "_run_" + str(current_run),
@@ -238,12 +246,15 @@ def cwr_star_or_ar1_star_free_train(
     if current_task == "ni":
         batches = NI_TRAINING_BATCHES
         validation_batch = NI_TESTING_BATCH
+        populate_rm_batches = NI_POPULATE_RM_EPOCHS
     elif current_task in ["nc", "multi-task-nc"]:
         batches = NC_TRAINING_BATCHES
         validation_batch = NC_TESTING_BATCH
+        populate_rm_batches = NC_POPULATE_RM_EPOCHS
     elif current_task in ["nic", "nicv2_391"]:
         batches = NIC_CUMULATIVE_TRAINING_BATCHES
         validation_batch = NIC_CUMULATIVE_TESTING_BATCH
+        populate_rm_batches = NIC_POPULATE_RM_EPOCHS
     else:
         raise ValueError("Invalid task name!")
 
@@ -269,6 +280,7 @@ def cwr_star_or_ar1_star_free_train(
                 CWR_STAR_LEARNING_RATES if is_cwr_star else AR1_STAR_FREE_LEARNING_RATES
             ),
             rehearsal_memory_size=rehearsal_memory_size,
+            populate_rm_epochs=populate_rm_batches,
             device=device,
             session_name=session_name + "_run_" + str(current_run),
             model_saving_frequency=40,
@@ -297,14 +309,17 @@ def ar1_star_train(
         batches = NI_TRAINING_BATCHES
         validation_batch = NI_TESTING_BATCH
         lr_modulation_batch_specific_weights = NI_BATCH_SPECIFIC_WEIGHTS
+        populate_rm_batches = NI_POPULATE_RM_EPOCHS
     elif current_task in ["nc", "multi-task-nc"]:
         batches = NC_TRAINING_BATCHES
         validation_batch = NC_TESTING_BATCH
         lr_modulation_batch_specific_weights = NC_BATCH_SPECIFIC_WEIGHTS
+        populate_rm_batches = NC_POPULATE_RM_EPOCHS
     elif current_task in ["nic", "nicv2_391"]:
         batches = NIC_CUMULATIVE_TRAINING_BATCHES
         validation_batch = NIC_CUMULATIVE_TESTING_BATCH
         lr_modulation_batch_specific_weights = NIC_BATCH_SPECIFIC_WEIGHTS
+        populate_rm_batches = NIC_POPULATE_RM_EPOCHS
     else:
         raise ValueError("Invalid task name!")
 
@@ -323,6 +338,7 @@ def ar1_star_train(
             mini_batch_size=128,
             learning_rates=AR1_STAR_LEARNING_RATES,
             rehearsal_memory_size=rehearsal_memory_size,
+            populate_rm_epochs=populate_rm_batches,
             device=device,
             session_name=session_name + "_run_" + str(current_run),
             lr_modulation_batch_specific_weights=lr_modulation_batch_specific_weights,

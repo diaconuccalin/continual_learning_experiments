@@ -31,6 +31,7 @@ def vit_lr_epoch(
     model_saving_frequency,
     current_run,
     num_layers,
+    populate_rm_epochs,
     category_based_split,
     device,
     profiling_activated,
@@ -158,7 +159,9 @@ def vit_lr_epoch(
             )
 
     # Populate rehearsal memory
-    data_loader.populate_rm()
+    if current_epoch in populate_rm_epochs:
+        print("\nPopulating rehearsal memory...\n")
+        data_loader.populate_rm()
 
     # Save model only when debug mode is not active
     if not data_loader.debug_mode and (
@@ -215,6 +218,7 @@ def vit_training_pipeline(
     num_layers,
     mini_batch_size,
     rehearsal_memory_size,
+    populate_rm_epochs,
     device,
     pretrained_weights_path,
     current_scenario,
@@ -437,6 +441,7 @@ def vit_training_pipeline(
             model_saving_frequency=model_saving_frequency,
             current_run=current_run,
             num_layers=num_layers,
+            populate_rm_epochs=populate_rm_epochs,
             category_based_split=category_based_split,
             device=device,
             profiling_activated=profiling_activated,
@@ -496,6 +501,7 @@ def vit_training_pipeline(
                     model_saving_frequency=model_saving_frequency,
                     current_run=current_run,
                     num_layers=num_layers,
+                    populate_rm_epochs=populate_rm_epochs,
                     category_based_split=category_based_split,
                     device=device,
                     profiling_activated=profiling_activated,
