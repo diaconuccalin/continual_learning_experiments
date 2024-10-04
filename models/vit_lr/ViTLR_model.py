@@ -18,6 +18,8 @@ class ViTLR(nn.Module):
         ff_dim: int = 3072,
         dropout_rate: float = 0.1,
         num_classes: int = 1000,
+        # Currently supports choosing only one of the transformer blocks or -1 for native run
+        latent_replay_layer: int = -1,
     ):
         super().__init__()
 
@@ -53,6 +55,7 @@ class ViTLR(nn.Module):
             tgt_len=self.seq_len,
             ff_dim=ff_dim,
             dropout=dropout_rate,
+            latent_replay_block=latent_replay_layer,
             device=device,
         )
 
@@ -60,22 +63,35 @@ class ViTLR(nn.Module):
         self.fc = nn.Linear(hidden_dimension, num_classes)
 
     def forward(self, x):
-        b, c, h, w = x.shape
+        # Check whether the input is a pattern (an original image), or a stored activation
+        is_pattern = True
+        if isinstance(x, tuple):
+            is_pattern, x = x
 
-        # b, c, h, w
-        x = self.patch_embedding(x)
+        if is_pattern:
+            b, c, h, w = x.shape
 
-        # b, dim, nph, npw (number of patches - height and width)
-        x = x.flatten(2).transpose(1, 2)
+            # b, c, h, w
+            x = self.patch_embedding(x)
 
-        # b, nph * npw, dim
-        x = torch.cat((self.class_token.expand(b, -1, -1), x), dim=1)
+            # b, dim, nph, npw (number of patches - height and width)
+            x = x.flatten(2).transpose(1, 2)
+
+            # b, nph * npw, dim
+            x = torch.cat((self.class_token.expand(b, -1, -1), x), dim=1)
+
+            # b, nph * npw + 1, dim
+            x = self.positional_embedding(x)
 
         # b, nph * npw + 1, dim
-        x = self.positional_embedding(x)
-
-        # b, nph * npw + 1, dim
-        x = self.transformer(x)
+        assert (
+            x.shape[1] == self.seq_len
+        ), f"Expected activation with second shape {self.seq_len}, got {x.shape[1]}."
+        assert x.shape[2] == self.patch_embedding.out_channels, (
+            f"Expected activation with third shape {self.patch_embedding.out_channels}"
+            f", got {x.shape[2]}."
+        )
+        x = self.transformer((is_pattern, x))
 
         # b, nph * npw + 1, dim
         x = torch.tanh(x)

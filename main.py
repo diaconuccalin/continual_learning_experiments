@@ -176,7 +176,7 @@ def vit_lr_core50_evaluation(device, weights_path, category_based_split, current
     print("Evaluation successfully completed!")
 
 
-def native_cumulative(
+def native_cumulative_train(
     device,
     session_name,
     profiling_activated,
@@ -231,7 +231,7 @@ def native_cumulative(
         )
 
 
-def cwr_star_or_ar1_star_free_train(
+def native_cwr_star_or_ar1_star_free_train(
     device,
     session_name,
     profiling_activated,
@@ -294,7 +294,7 @@ def cwr_star_or_ar1_star_free_train(
         )
 
 
-def ar1_star_train(
+def native_ar1_star_train(
     device,
     session_name,
     profiling_activated,
@@ -376,10 +376,10 @@ def main():
     available_pipelines = [
         "vit_demo_naive_finetune",
         "vit_lr_core50_evaluation",
-        "native_cumulative",
-        "cwr_star_train",
-        "ar1_star_train",
-        "ar1_star_free_train",
+        "native_cumulative_train",
+        "native_cwr_star_train",
+        "native_ar1_star_train",
+        "native_ar1_star_free_train",
     ]
     assert (
         pipeline in available_pipelines
@@ -416,8 +416,8 @@ def main():
             category_based_split=category_based_split,
             current_task=current_task,
         )
-    elif pipeline == "native_cumulative":
-        native_cumulative(
+    elif pipeline == "native_cumulative_train":
+        native_cumulative_train(
             device=device,
             session_name=session_name,
             profiling_activated=profiling_activated,
@@ -426,7 +426,7 @@ def main():
             runs=runs,
             should_validate=do_validation,
         )
-    elif pipeline == "cwr_star_train":
+    elif pipeline == "native_cwr_star_train":
         for rehearsal_memory_size in rehearsal_memory_sizes:
             print(
                 "--------------- Starting training with rm size of",
@@ -434,7 +434,7 @@ def main():
                 "---------------",
             )
 
-            cwr_star_or_ar1_star_free_train(
+            native_cwr_star_or_ar1_star_free_train(
                 device=device,
                 session_name=session_name
                 + "_rms_"
@@ -448,7 +448,7 @@ def main():
                 is_cwr_star=True,
                 should_validate=do_validation,
             )
-    elif pipeline == "ar1_star_train":
+    elif pipeline == "native_ar1_star_train":
         for rehearsal_memory_size in rehearsal_memory_sizes:
             print(
                 "--------------- Starting training with rm size of",
@@ -456,7 +456,7 @@ def main():
                 "---------------",
             )
 
-            ar1_star_train(
+            native_ar1_star_train(
                 device=device,
                 session_name=session_name + "_rms_" + str(rehearsal_memory_size),
                 profiling_activated=profiling_activated,
@@ -466,7 +466,7 @@ def main():
                 rehearsal_memory_size=rehearsal_memory_size,
                 should_validate=do_validation,
             )
-    elif pipeline == "ar1_star_free_train":
+    elif pipeline == "native_ar1_star_free_train":
         for rehearsal_memory_size in rehearsal_memory_sizes:
             print(
                 "--------------- Starting training with rm size of",
@@ -474,7 +474,7 @@ def main():
                 "---------------",
             )
 
-            cwr_star_or_ar1_star_free_train(
+            native_cwr_star_or_ar1_star_free_train(
                 device=device,
                 session_name=session_name + "_rms_" + str(rehearsal_memory_size),
                 profiling_activated=profiling_activated,

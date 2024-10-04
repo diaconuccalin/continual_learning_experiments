@@ -12,9 +12,17 @@ class Transformer(nn.Module):
         tgt_len,
         ff_dim,
         dropout,
+        latent_replay_block,
         device,
     ):
         super().__init__()
+
+        # Set latent replay block
+        assert (
+            -1 <= latent_replay_block < num_layers
+        ), "Invalid latent replay block selection."
+        self.latent_replay_block = latent_replay_block
+
         self.blocks = nn.ModuleList(
             [
                 TransformerBlock(
@@ -30,7 +38,15 @@ class Transformer(nn.Module):
         )
 
     def forward(self, x):
-        for block in self.blocks:
+        is_pattern, x = x
+
+        if is_pattern:
+            blocks_to_run = self.blocks
+        else:
+            assert self.latent_replay_block > -1, "Latent replay block not set."
+            blocks_to_run = self.blocks[self.latent_replay_block :]
+
+        for block in blocks_to_run:
             x = block(x)
 
         return x
