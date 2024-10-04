@@ -22,12 +22,15 @@ class CORe50DataLoader(object):
         image_channels: int = 3,
         scenario: str = "ni",
         rehearsal_memory_size: int = 0,
+        # Not using actual mini-batches larger than 1 anymore, but working with "virtual" mini-batches
+        # (One sample fed at a time and model updated after a number of samples equivalent to the mini-batch size)
         # Any value lower than 1 will lead to loading the entire batch
-        mini_batch_size: int = 0,
+        # mini_batch_size: int = 0,
         batch: int = 0,
         start_run: int = 0,
         start_idx: int = 0,
         initial_batches: list = None,
+        use_latent_replay: bool = False,
         randomize_data_order: bool = False,
         # If False, use the default 50 classes; if True, use the 10 categories,
         # by mapping each 5 classes into the corresponding category
@@ -63,13 +66,15 @@ class CORe50DataLoader(object):
         self.resize_procedure = resize_procedure
         self.in_channels = image_channels
         self.scenario = scenario
-        self.mini_batch_size = mini_batch_size
         self.batch = batch
         self.run = start_run
         self.idx = start_idx
         self.randomize_data_order = randomize_data_order
         self.category_based_split = category_based_split
         self.debug_mode = debug_mode
+        self.use_latent_replay = use_latent_replay
+        self.stored_activations = list()
+        self.stored_activations_indexes = list()
 
         # Native rehearsal variables
         self.rm = list()
@@ -114,62 +119,71 @@ class CORe50DataLoader(object):
         if self.idx == len(self.idx_order):
             raise StopIteration
 
-        # Prepare the list of image paths
-        img_paths = list()
+        # Get sample from stored activations list, if available
+        if self.idx_order[self.idx] in self.stored_activations_indexes:
+            # Obtain stored activation
+            x, y = self.stored_activations[
+                self.stored_activations_indexes.index(self.idx_order[self.idx])
+            ]
 
-        # Prepare output tensor
-        y = np.zeros(self.mini_batch_size, dtype=np.int64)
-
-        for mini_batch_element in range(self.mini_batch_size):
+            # Mark it as activation
+            x = (False, x)
+        # Get image path and label otherwise
+        else:
             # Get file path
             file_path = self.paths[self.idx_order[self.idx]]
 
-            # Load image path
-            img_paths.append(
-                os.path.join(
-                    self.root,
-                    "core50_"
-                    + str(self.original_image_size[0])
-                    + "x"
-                    + str(self.original_image_size[1]),
-                    file_path,
-                )
+            # Determine image path
+            img_path = os.path.join(
+                self.root,
+                "core50_"
+                + str(self.original_image_size[0])
+                + "x"
+                + str(self.original_image_size[1]),
+                file_path,
             )
+
+            # Load image
+            if not self.debug_mode:
+                x = self.get_image_from_path(img_path).astype(np.uint8)
+
+                # Resize image if needed
+                # Case 1: larger target image, resize by bordering (equal neutral gray border on either side)
+                if self.resize_procedure == ResizeProcedure.BORDER:
+                    x = bordering_resize(
+                        x,
+                        input_image_size=self.input_image_size,
+                        original_image_size=self.original_image_size,
+                    )
+
+                # Mark it as pattern
+                x = (True, x)
+            else:
+                x = None
 
             # Determine label
-            y[mini_batch_element] = (
-                int(file_path.split("/o")[1].split("/C")[0].split("/")[0]) - 1
-            )
+            y = int(file_path.split("/o")[1].split("/C")[0].split("/")[0]) - 1
 
-            self.idx += 1
+            # Use category split if required
+            if self.category_based_split:
+                y = np.array([int(y / 5)], dtype=np.int64)
+            else:
+                y = np.array([y], dtype=np.int64)
+
+        # Increment current index
+        self.idx += 1
 
         # Don't load images in debug mode
         if self.debug_mode:
             return None, None
 
-        # Load images
-        x = self.get_batch_from_paths(img_paths).astype(np.uint8)
-
-        # Resize image if needed
-        # Case 1: larger target image, resize by bordering (equal neutral gray border on either side)
-        if self.resize_procedure == ResizeProcedure.BORDER:
-            x = bordering_resize(
-                x,
-                input_image_size=self.input_image_size,
-                original_image_size=self.original_image_size,
-            )
-
-        # Use category split if required
-        if self.category_based_split:
-            y = np.array([int(y_i / 5) for y_i in y], dtype=np.int64)
-
         return x, torch.from_numpy(y).to(torch.long)
 
-    def get_batch_from_paths(self, paths):
-        # Prepare variable to store the images
+    def get_image_from_path(self, path):
+        # Prepare variable to store the image
         x = np.zeros(
             (
-                len(paths),
+                1,
                 self.original_image_size[0],
                 self.original_image_size[1],
                 self.in_channels,
@@ -177,14 +191,12 @@ class CORe50DataLoader(object):
             dtype=np.uint8,
         )
 
-        # Iterate through paths and load images
-        for i, path in enumerate(paths):
-            # Load as grayscale
-            if self.in_channels == 1:
-                x[i, :, :, 0] = np.array(Image.open(path).convert("L"))
-            # Load normally
-            else:
-                x[i] = np.array(Image.open(path))
+        # Load as grayscale
+        if self.in_channels == 1:
+            x[0, :, :, 0] = np.array(Image.open(path).convert("L"))
+        # Load normally
+        else:
+            x[0] = np.array(Image.open(path))
 
         return x
 
@@ -208,8 +220,9 @@ class CORe50DataLoader(object):
         # Store current batch ids
         self.current_batch = self.idx_order.copy()
 
-        # Add exemplar set to id list
-        self.idx_order += self.rm
+        # Add exemplar set to id list if needed
+        if len(self.rm) > 0 and self.rm[0] not in self.idx_order:
+            self.idx_order += self.rm
 
         # Check final size
         if self.debug_mode:
@@ -219,20 +232,6 @@ class CORe50DataLoader(object):
         # Randomize their order if required
         if self.randomize_data_order:
             self.idx_order = random.sample(self.idx_order, len(self.idx_order))
-
-        # Load entire batch scenario
-        batch_len = len(self.idx_order)
-        if self.mini_batch_size < 1 or self.mini_batch_size > batch_len:
-            print(
-                "Mini batch size provided determines the loading of the entire batch."
-            )
-            self.mini_batch_size = batch_len
-        # If not, remove a number of random images from the train set, such that we exactly fill all the mini-batches
-        elif self.mini_batch_size != 1:
-            self.idx_order = random.sample(
-                self.idx_order,
-                len(self.idx_order) - batch_len % self.mini_batch_size,
-            )
 
         return None
 
@@ -261,7 +260,11 @@ class CORe50DataLoader(object):
         assert h <= self.rm_size, "Rehearsal memory size exceeded."
 
         # Get random h patterns to keep
-        r_add = random.sample(self.current_batch, h)
+        if not self.use_latent_replay:
+            r_add = random.sample(self.current_batch, h)
+        else:
+            assert h == len(self.stored_activations), "Latent replay size mismatch."
+            r_add = self.stored_activations_indexes
 
         # Manipulate patterns in rm as required
         if self.batches_so_far in self.initial_batches:

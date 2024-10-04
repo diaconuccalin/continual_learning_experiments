@@ -64,9 +64,7 @@ class ViTLR(nn.Module):
 
     def forward(self, x):
         # Check whether the input is a pattern (an original image), or a stored activation
-        is_pattern = True
-        if isinstance(x, tuple):
-            is_pattern, x = x
+        is_pattern, x = x
 
         if is_pattern:
             b, c, h, w = x.shape

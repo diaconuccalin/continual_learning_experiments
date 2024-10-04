@@ -111,7 +111,7 @@ def vit_lr_epoch(
                 continue
 
             # Load on GPU
-            x_train = vit_lr_image_preprocessing(x_train).to(device)
+            x_train = vit_lr_image_preprocessing(x=x_train, device=device)
             y_train = y_train.to(device)
 
             # Forward
@@ -256,7 +256,6 @@ def vit_training_pipeline(
         resize_procedure=ResizeProcedure.BORDER,
         image_channels=3,
         scenario=current_task,
-        mini_batch_size=1,
         rehearsal_memory_size=rehearsal_memory_size,
         batch=batches[0],
         initial_batches=initial_batches,

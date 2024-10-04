@@ -43,7 +43,6 @@ def vit_lr_evaluation_pipeline(
         resize_procedure=ResizeProcedure.BORDER,
         image_channels=3,
         scenario=current_task,
-        mini_batch_size=1,
         start_run=current_run,
         batch=batch,
         start_idx=0,
@@ -96,7 +95,7 @@ def vit_lr_evaluation_pipeline(
     for _ in progress_bar:
         # Prepare sample
         x_train, y_train = data_loader.__next__()
-        x_train = vit_lr_image_preprocessing(x_train).to(device)
+        x_train = vit_lr_image_preprocessing(x=x_train, device=device)
 
         y_train = y_train.item()
         y_pred = torch.argmax(model(x_train)).item()

@@ -26,7 +26,9 @@ def fastexp_gist(x):
     return x_copy.type(torch.uint32).view(torch.float32)
 
 
-def vit_lr_image_preprocessing(x):
+def vit_lr_image_preprocessing(x, device=None):
+    is_pattern, x = x
+
     x = x.astype(np.float32)
 
     x /= 255
@@ -39,7 +41,12 @@ def vit_lr_image_preprocessing(x):
     x[..., 1] /= 0.224
     x[..., 2] /= 0.225
 
-    return torch.from_numpy(x).permute((0, 3, 1, 2))
+    x = torch.from_numpy(x).permute((0, 3, 1, 2))
+
+    if device is not None:
+        x = x.to(device)
+
+    return is_pattern, x
 
 
 def bordering_resize(x, original_image_size, input_image_size):
