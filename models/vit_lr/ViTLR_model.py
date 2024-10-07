@@ -114,12 +114,21 @@ class ViTLR(nn.Module):
         else:
             return x, activation
 
-    def set_backbone_trainable(self, trainable: bool):
+    def set_backbone_trainable(
+        self, trainable: bool, only_before_lr_layer: bool = False
+    ):
         self.patch_embedding.requires_grad_(trainable)
         self.class_token.requires_grad_(trainable)
         self.positional_embedding.requires_grad_(trainable)
-        self.transformer.requires_grad_(trainable)
-        self.norm.requires_grad_(trainable)
+
+        if only_before_lr_layer:
+            for i, transformer_block in enumerate(self.transformer.blocks):
+                if i == self.transformer.latent_replay_block:
+                    break
+                transformer_block.requires_grad_(trainable)
+        else:
+            self.transformer.requires_grad_(trainable)
+            self.norm.requires_grad_(trainable)
 
         for transformer_block in self.transformer.blocks:
             transformer_block.attn.proj_out.requires_grad_(False)

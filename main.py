@@ -23,7 +23,15 @@ from datasets.core50.constants import (
 )
 from evaluation.evaluation_utils import plot_confusion_matrix, plot_losses
 from evaluation.vit_lr_evaluation_loop import vit_lr_evaluation_pipeline
-from training.PipelineScenario import PipelineScenario
+from training.PipelineScenario import (
+    PipelineScenario,
+    PIPELINES_WITH_RM,
+    PIPELINES_WITH_LR_MODULATION,
+    CWR_STAR_PIPELINES,
+    AR1_STAR_PURE_PIPELINES,
+    AR1_STAR_FREE_PIPELINES,
+    LR_PIPELINES,
+)
 from training.training_utils import CONSTANT_TRAINING_PARAMETERS
 from training.vit_lr_training_loops import vit_training_pipeline
 
@@ -97,7 +105,7 @@ def vit_demo_naive_finetune(
     should_validate,
 ):
     vit_training_pipeline(
-        current_scenario=PipelineScenario.NATIVE_REHEARSAL,
+        current_scenario=PipelineScenario.NATIVE_CUMULATIVE,
         batches=NI_TRAINING_BATCHES,
         populate_rm_epochs=NI_POPULATE_RM_EPOCHS,
         initial_batches=[
@@ -108,7 +116,6 @@ def vit_demo_naive_finetune(
         rehearsal_memory_size=0,
         device=device,
         session_name=session_name,
-        trainable_backbone=True,
         randomize_data_order=True,
         category_based_split=category_based_split,
         profiling_activated=profiling_activated,
@@ -178,30 +185,72 @@ def vit_lr_core50_evaluation(device, weights_path, category_based_split, current
     print("Evaluation successfully completed!")
 
 
-def native_cumulative_train(
+def vit_lr_train(
     device,
     session_name,
     profiling_activated,
     data_loader_debug_mode,
     current_task,
+    current_scenario,
     runs,
     should_validate=False,
+    latent_replay_layer=None,
 ):
     # Choose batches
+    populate_rm_batches = None
+    lr_modulation_batch_specific_weights = None
     if current_task == "ni":
         batches = NI_TRAINING_BATCHES
         validation_batch = NI_TESTING_BATCH
-        populate_rm_batches = NI_POPULATE_RM_EPOCHS
+
+        if current_scenario in PIPELINES_WITH_RM:
+            populate_rm_batches = NI_POPULATE_RM_EPOCHS
+        if current_scenario in PIPELINES_WITH_LR_MODULATION:
+            lr_modulation_batch_specific_weights = NI_BATCH_SPECIFIC_WEIGHTS
     elif current_task in ["nc", "multi-task-nc"]:
         batches = NC_TRAINING_BATCHES
         validation_batch = NC_TESTING_BATCH
-        populate_rm_batches = NC_POPULATE_RM_EPOCHS
+
+        if current_scenario in PIPELINES_WITH_RM:
+            populate_rm_batches = NC_POPULATE_RM_EPOCHS
+        if current_scenario in PIPELINES_WITH_LR_MODULATION:
+            lr_modulation_batch_specific_weights = NC_BATCH_SPECIFIC_WEIGHTS
     elif current_task in ["nic", "nicv2_391"]:
         batches = NIC_CUMULATIVE_TRAINING_BATCHES
         validation_batch = NIC_CUMULATIVE_TESTING_BATCH
-        populate_rm_batches = NIC_POPULATE_RM_EPOCHS
+
+        if current_scenario in PIPELINES_WITH_RM:
+            populate_rm_batches = NIC_POPULATE_RM_EPOCHS
+        if current_scenario in PIPELINES_WITH_LR_MODULATION:
+            lr_modulation_batch_specific_weights = NIC_BATCH_SPECIFIC_WEIGHTS
     else:
         raise ValueError("Invalid task name!")
+
+    if current_scenario != PipelineScenario.NATIVE_CUMULATIVE:
+        model_saving_frequency = 40
+    else:
+        model_saving_frequency = 1
+
+    if current_scenario in CWR_STAR_PIPELINES:
+        learning_rates = CWR_STAR_LEARNING_RATES
+    elif current_scenario in AR1_STAR_PURE_PIPELINES:
+        learning_rates = AR1_STAR_LEARNING_RATES
+    elif current_scenario in AR1_STAR_FREE_PIPELINES:
+        learning_rates = AR1_STAR_FREE_LEARNING_RATES
+    else:
+        learning_rates = [
+            0.01,
+        ] * len(batches)
+        model_saving_frequency = 1
+
+    if current_scenario == PipelineScenario.LR_CWR_STAR:
+        latent_replay_layer = 11
+    elif current_scenario in LR_PIPELINES:
+        assert (
+            latent_replay_layer is not None
+        ), "Latent replay layer must be set for current scenario."
+    else:
+        latent_replay_layer = -1
 
     for current_run in runs:
         print(
@@ -211,7 +260,7 @@ def native_cumulative_train(
         )
 
         vit_training_pipeline(
-            current_scenario=PipelineScenario.NATIVE_REHEARSAL,
+            current_scenario=current_scenario,
             batches=batches,
             initial_batches=[
                 0,
@@ -220,152 +269,24 @@ def native_cumulative_train(
             current_run=current_run,
             mini_batch_size=128,
             rehearsal_memory_size=0,
-            populate_rm_epochs=populate_rm_batches,
-            device=device,
-            session_name=session_name + "_run_" + str(current_run),
-            model_saving_frequency=1,
-            trainable_backbone=True,
-            randomize_data_order=True,
-            category_based_split=False,
-            profiling_activated=profiling_activated,
-            data_loader_debug_mode=data_loader_debug_mode,
-            should_validate=should_validate,
-            validation_batch=validation_batch,
-            **CONSTANT_TRAINING_PARAMETERS,
-        )
-
-
-def native_cwr_star_or_ar1_star_free_train(
-    device,
-    session_name,
-    profiling_activated,
-    data_loader_debug_mode,
-    current_task,
-    runs,
-    rehearsal_memory_size,
-    is_cwr_star=True,
-    should_validate=False,
-):
-    # Choose batches
-    if current_task == "ni":
-        batches = NI_TRAINING_BATCHES
-        validation_batch = NI_TESTING_BATCH
-        populate_rm_batches = NI_POPULATE_RM_EPOCHS
-    elif current_task in ["nc", "multi-task-nc"]:
-        batches = NC_TRAINING_BATCHES
-        validation_batch = NC_TESTING_BATCH
-        populate_rm_batches = NC_POPULATE_RM_EPOCHS
-    elif current_task in ["nic", "nicv2_391"]:
-        batches = NIC_CUMULATIVE_TRAINING_BATCHES
-        validation_batch = NIC_CUMULATIVE_TESTING_BATCH
-        populate_rm_batches = NIC_POPULATE_RM_EPOCHS
-    else:
-        raise ValueError("Invalid task name!")
-
-    for current_run in runs:
-        print(
-            "--------------- Starting run",
-            current_run,
-            "---------------",
-        )
-
-        vit_training_pipeline(
-            current_scenario=(
-                PipelineScenario.NATIVE_CWR_STAR
-                if is_cwr_star
-                else PipelineScenario.NATIVE_AR1_STAR_FREE
-            ),
-            batches=batches,
-            initial_batches=[
-                0,
-            ],
-            current_task=current_task,
-            current_run=current_run,
-            mini_batch_size=128,
-            learning_rates=(
-                CWR_STAR_LEARNING_RATES if is_cwr_star else AR1_STAR_FREE_LEARNING_RATES
-            ),
-            rehearsal_memory_size=rehearsal_memory_size,
-            populate_rm_epochs=populate_rm_batches,
-            device=device,
-            session_name=session_name + "_run_" + str(current_run),
-            model_saving_frequency=40,
-            randomize_data_order=True,
-            category_based_split=False,
-            profiling_activated=profiling_activated,
-            data_loader_debug_mode=data_loader_debug_mode,
-            should_validate=should_validate,
-            validation_batch=validation_batch,
-            **CONSTANT_TRAINING_PARAMETERS,
-        )
-
-
-def native_ar1_star_train(
-    device,
-    session_name,
-    profiling_activated,
-    data_loader_debug_mode,
-    current_task,
-    runs,
-    rehearsal_memory_size,
-    should_validate=False,
-):
-    # Choose batches
-    if current_task == "ni":
-        batches = NI_TRAINING_BATCHES
-        validation_batch = NI_TESTING_BATCH
-        lr_modulation_batch_specific_weights = NI_BATCH_SPECIFIC_WEIGHTS
-        populate_rm_batches = NI_POPULATE_RM_EPOCHS
-    elif current_task in ["nc", "multi-task-nc"]:
-        batches = NC_TRAINING_BATCHES
-        validation_batch = NC_TESTING_BATCH
-        lr_modulation_batch_specific_weights = NC_BATCH_SPECIFIC_WEIGHTS
-        populate_rm_batches = NC_POPULATE_RM_EPOCHS
-    elif current_task in ["nic", "nicv2_391"]:
-        batches = NIC_CUMULATIVE_TRAINING_BATCHES
-        validation_batch = NIC_CUMULATIVE_TESTING_BATCH
-        lr_modulation_batch_specific_weights = NIC_BATCH_SPECIFIC_WEIGHTS
-        populate_rm_batches = NIC_POPULATE_RM_EPOCHS
-    else:
-        raise ValueError("Invalid task name!")
-
-    for current_run in runs:
-        print(
-            "--------------- Starting run",
-            current_run,
-            "---------------",
-        )
-
-        vit_training_pipeline(
-            current_scenario=PipelineScenario.NATIVE_AR1_STAR,
-            batches=batches,
-            initial_batches=[
-                0,
-            ],
-            current_task=current_task,
-            current_run=current_run,
-            mini_batch_size=128,
-            learning_rates=AR1_STAR_LEARNING_RATES,
-            rehearsal_memory_size=rehearsal_memory_size,
+            learning_rates=learning_rates,
             populate_rm_epochs=populate_rm_batches,
             device=device,
             session_name=session_name + "_run_" + str(current_run),
             lr_modulation_batch_specific_weights=lr_modulation_batch_specific_weights,
-            model_saving_frequency=40,
+            model_saving_frequency=model_saving_frequency,
             randomize_data_order=True,
             category_based_split=False,
             profiling_activated=profiling_activated,
             data_loader_debug_mode=data_loader_debug_mode,
             should_validate=should_validate,
             validation_batch=validation_batch,
+            latent_replay_layer=latent_replay_layer,
             **CONSTANT_TRAINING_PARAMETERS,
         )
 
 
 def main():
-    # Training constants (temporary implementation)
-    category_based_split = False
-
     # Parse arguments
     parser = create_arg_parser()
     args = parser.parse_args()
@@ -384,10 +305,13 @@ def main():
     available_pipelines = [
         "vit_demo_naive_finetune",
         "vit_lr_core50_evaluation",
-        "native_cumulative_train",
-        "native_cwr_star_train",
-        "native_ar1_star_train",
+        "native_cumulative_train",  # PipelineScenario.NATIVE_CUMULATIVE
+        "native_cwr_star_train",  # PipelineScenario.NATIVE_CWR_STAR
+        "native_ar1_star_train",  # PipelineScenario.NATIVE_AR1_STAR_FREE
         "native_ar1_star_free_train",
+        "lr_cwr_star_train",
+        "lr_ar1_star_train",
+        "lr_ar1_star_free_train",
     ]
     assert (
         pipeline in available_pipelines
@@ -412,7 +336,7 @@ def main():
         vit_demo_naive_finetune(
             device=device,
             session_name=session_name,
-            category_based_split=category_based_split,
+            category_based_split=False,
             profiling_activated=profiling_activated,
             current_task=current_task,
             should_validate=do_validation,
@@ -421,11 +345,12 @@ def main():
         vit_lr_core50_evaluation(
             device=device,
             weights_path=weights_path,
-            category_based_split=category_based_split,
+            category_based_split=False,
             current_task=current_task,
         )
     elif pipeline == "native_cumulative_train":
-        native_cumulative_train(
+        vit_lr_train(
+            current_scenario=PipelineScenario.NATIVE_CUMULATIVE,
             device=device,
             session_name=session_name,
             profiling_activated=profiling_activated,
@@ -434,7 +359,21 @@ def main():
             runs=runs,
             should_validate=do_validation,
         )
-    elif pipeline == "native_cwr_star_train":
+    else:
+        current_scenario = None
+        if pipeline == "native_cwr_star_train":
+            current_scenario = PipelineScenario.NATIVE_CWR_STAR
+        elif pipeline == "native_ar1_star_train":
+            current_scenario = PipelineScenario.NATIVE_AR1_STAR
+        elif pipeline == "native_ar1_star_free_train":
+            current_scenario = PipelineScenario.NATIVE_AR1_STAR_FREE
+        elif pipeline == "lr_cwr_star_train":
+            current_scenario = PipelineScenario.LR_CWR_STAR
+        elif pipeline == "lr_ar1_star_train":
+            current_scenario = PipelineScenario.LR_AR1_STAR
+        elif pipeline == "lr_ar1_star_free_train":
+            current_scenario = PipelineScenario.LR_AR1_STAR_FREE
+
         for rehearsal_memory_size in rehearsal_memory_sizes:
             print(
                 "--------------- Starting training with rm size of",
@@ -442,55 +381,14 @@ def main():
                 "---------------",
             )
 
-            native_cwr_star_or_ar1_star_free_train(
-                device=device,
-                session_name=session_name
-                + "_rms_"
-                + str(rehearsal_memory_size)
-                + "_run_",
-                profiling_activated=profiling_activated,
-                data_loader_debug_mode=data_loader_debug_mode,
-                current_task=current_task,
-                runs=runs,
-                rehearsal_memory_size=rehearsal_memory_size,
-                is_cwr_star=True,
-                should_validate=do_validation,
-            )
-    elif pipeline == "native_ar1_star_train":
-        for rehearsal_memory_size in rehearsal_memory_sizes:
-            print(
-                "--------------- Starting training with rm size of",
-                rehearsal_memory_size,
-                "---------------",
-            )
-
-            native_ar1_star_train(
+            vit_lr_train(
+                current_scenario=current_scenario,
                 device=device,
                 session_name=session_name + "_rms_" + str(rehearsal_memory_size),
                 profiling_activated=profiling_activated,
                 data_loader_debug_mode=data_loader_debug_mode,
                 current_task=current_task,
                 runs=runs,
-                rehearsal_memory_size=rehearsal_memory_size,
-                should_validate=do_validation,
-            )
-    elif pipeline == "native_ar1_star_free_train":
-        for rehearsal_memory_size in rehearsal_memory_sizes:
-            print(
-                "--------------- Starting training with rm size of",
-                rehearsal_memory_size,
-                "---------------",
-            )
-
-            native_cwr_star_or_ar1_star_free_train(
-                device=device,
-                session_name=session_name + "_rms_" + str(rehearsal_memory_size),
-                profiling_activated=profiling_activated,
-                data_loader_debug_mode=data_loader_debug_mode,
-                current_task=current_task,
-                runs=runs,
-                rehearsal_memory_size=rehearsal_memory_size,
-                is_cwr_star=False,
                 should_validate=do_validation,
             )
 

@@ -16,7 +16,14 @@ from models.vit_lr.ResizeProcedure import ResizeProcedure
 from models.vit_lr.ViTLR_model import ViTLR
 from models.vit_lr.vit_lr_utils import vit_lr_image_preprocessing
 from training.CustomSGD import CustomSGD
-from training.PipelineScenario import PipelineScenario
+from training.PipelineScenario import (
+    PIPELINES_WITH_LR_MODULATION,
+    LR_PIPELINES,
+    PIPELINES_WITH_RM,
+    PIPELINES_WITH_FROZEN_BACKBONE,
+    AR1_STAR_PURE_PIPELINES,
+    CWR_STAR_PIPELINES,
+)
 
 
 def vit_lr_epoch(
@@ -251,8 +258,8 @@ def vit_training_pipeline(
     lr_modulation_batch_specific_weights=None,
     xi=1e-7,
     max_f=0.001,
+    latent_replay_layer=-1,
     model_saving_frequency=1,
-    trainable_backbone=False,
     randomize_data_order=True,
     category_based_split=False,
     profiling_activated=False,
@@ -261,7 +268,7 @@ def vit_training_pipeline(
     validation_batch=None,
 ):
     # Check that batch-specific weights are provided when dealing with AR1*
-    if current_scenario is PipelineScenario.NATIVE_AR1_STAR:
+    if current_scenario in PIPELINES_WITH_LR_MODULATION:
         assert (
             lr_modulation_batch_specific_weights is not None
         ), "Batch-specific weights required for AR1* pipeline!"
@@ -283,11 +290,14 @@ def vit_training_pipeline(
         scenario=current_task,
         rehearsal_memory_size=rehearsal_memory_size,
         batch=batches[0],
-        initial_batches=initial_batches,
         start_run=current_run,
+        initial_batches=initial_batches,
+        use_latent_replay=current_scenario in LR_PIPELINES,
         randomize_data_order=randomize_data_order,
         category_based_split=category_based_split,
         debug_mode=data_loader_debug_mode,
+        mini_batch_size=mini_batch_size,
+        keep_rehearsal_proportion=current_scenario in LR_PIPELINES,
     )
 
     # Prepare model save path
@@ -314,6 +324,7 @@ def vit_training_pipeline(
         num_layers=num_layers,
         input_size=input_image_size,
         num_classes=num_classes,
+        latent_replay_layer=latent_replay_layer,
     )
 
     # Load weights
@@ -330,11 +341,7 @@ def vit_training_pipeline(
     weights["fc.weight"] = model.fc.weight.data
     weights["fc.bias"] = model.fc.bias.data
 
-    if current_scenario in [
-        PipelineScenario.NATIVE_CWR_STAR,
-        PipelineScenario.NATIVE_AR1_STAR,
-        PipelineScenario.NATIVE_AR1_STAR_FREE,
-    ]:
+    if current_scenario in PIPELINES_WITH_RM:
         # Prepare consolidated weights (and biases) tensors and other required variables
         cw = torch.zeros(model.fc.weight.shape).to(device)
         cb = torch.zeros(model.fc.bias.shape).to(device)
@@ -353,10 +360,12 @@ def vit_training_pipeline(
         )
     model.load_state_dict(weights)
 
-    if current_scenario is PipelineScenario.NATIVE_REHEARSAL:
-        # Set whether backbone is trainable
-        print("Marking backbone as trainable or not...")
-        model.set_backbone_trainable(trainable_backbone)
+    # Set whether backbone is trainable
+    print("Marking backbone as trainable or not...")
+    if current_scenario in PIPELINES_WITH_FROZEN_BACKBONE:
+        model.set_backbone_trainable(False)
+    else:
+        model.set_backbone_trainable(True)
 
     # Move model to GPU
     model.to(device)
@@ -366,15 +375,6 @@ def vit_training_pipeline(
 
     # Prepare optimizer
     print("Preparing optimizer and loss function...")
-
-    # Mark backbone as trainable if required
-    if current_scenario is PipelineScenario.NATIVE_CWR_STAR:
-        model.set_backbone_trainable(False)
-    elif current_scenario in [
-        PipelineScenario.NATIVE_AR1_STAR,
-        PipelineScenario.NATIVE_AR1_STAR_FREE,
-    ]:
-        model.set_backbone_trainable(True)
 
     # Mark backbone trainable parameters
     is_backbone = list()
@@ -387,7 +387,7 @@ def vit_training_pipeline(
         else:
             is_backbone.append(False)
 
-    if current_scenario is PipelineScenario.NATIVE_AR1_STAR:
+    if current_scenario in AR1_STAR_PURE_PIPELINES:
         # Initialize a_star parameters
         f_hat = list()
         f = list()
@@ -481,11 +481,7 @@ def vit_training_pipeline(
                 data_loader.update_batch(current_batch)
                 data_loader.idx = 0
 
-                if current_scenario in [
-                    PipelineScenario.NATIVE_CWR_STAR,
-                    PipelineScenario.NATIVE_AR1_STAR,
-                    PipelineScenario.NATIVE_AR1_STAR_FREE,
-                ]:
+                if current_scenario in PIPELINES_WITH_RM:
                     # Find classes occurring in the current batch (and their occurrence count)
                     cur = data_loader.get_classes_in_current_batch()
 
@@ -498,16 +494,22 @@ def vit_training_pipeline(
                         model.fc.bias.data[j] = cb[j]
 
                     # Freeze backbone if required
-                    if current_scenario == PipelineScenario.NATIVE_CWR_STAR:
-                        if current_epoch == 1:
+                    if current_scenario in CWR_STAR_PIPELINES:
+                        if current_epoch in initial_batches:
                             model.set_backbone_trainable(True)
                         else:
                             model.set_backbone_trainable(False)
-                    elif current_scenario in [
-                        PipelineScenario.NATIVE_AR1_STAR,
-                        PipelineScenario.NATIVE_AR1_STAR_FREE,
-                    ]:
+                    elif current_scenario not in LR_PIPELINES:
                         model.set_backbone_trainable(True)
+                    elif current_scenario in LR_PIPELINES:
+                        if current_epoch in initial_batches:
+                            model.set_backbone_trainable(True)
+                        else:
+                            model.set_backbone_trainable(
+                                False, only_before_lr_layer=True
+                            )
+                            model.set_layer_norm_trainable()
+
                 else:
                     cur = None
 
@@ -533,11 +535,7 @@ def vit_training_pipeline(
                     validation_batch=validation_batch,
                 )
 
-                if current_scenario in [
-                    PipelineScenario.NATIVE_CWR_STAR,
-                    PipelineScenario.NATIVE_AR1_STAR,
-                    PipelineScenario.NATIVE_AR1_STAR_FREE,
-                ]:
+                if current_scenario in PIPELINES_WITH_RM:
                     print("\nUpdating consolidated weights...\n")
                     # Update consolidated weights
                     for j in cur.keys():
@@ -558,7 +556,7 @@ def vit_training_pipeline(
                         past[j] += cur[j]
 
                     # Update AR1* parameters
-                    if current_scenario is PipelineScenario.NATIVE_AR1_STAR:
+                    if current_scenario in AR1_STAR_PURE_PIPELINES:
                         optimizer.update_a1_star_params(batch_counter)
 
                     # Save cwr parameters
@@ -581,7 +579,7 @@ def vit_training_pipeline(
                             ),
                         )
 
-                        if current_scenario is PipelineScenario.NATIVE_AR1_STAR:
+                        if current_scenario in AR1_STAR_PURE_PIPELINES:
                             print("\nSaving AR1* parameters...\n")
                             torch.save(
                                 {
@@ -601,11 +599,7 @@ def vit_training_pipeline(
     # Update and save final model
     print("\nSaving final model...\n")
 
-    if current_scenario in [
-        PipelineScenario.NATIVE_CWR_STAR,
-        PipelineScenario.NATIVE_AR1_STAR,
-        PipelineScenario.NATIVE_AR1_STAR_FREE,
-    ]:
+    if current_scenario in PIPELINES_WITH_RM:
         model.fc.weight.data = cw
         model.fc.bias.data = cb
 
