@@ -132,7 +132,7 @@ def vit_lr_epoch(
                 (data_loader.idx - 1) in indexes_to_store
             ):
                 y_pred, activation = model(x=x_train, get_activation=True)
-                new_activations.append(activation)
+                new_activations.append((activation, y_pred))
             else:
                 y_pred = model(x=x_train, get_activation=False)
 
