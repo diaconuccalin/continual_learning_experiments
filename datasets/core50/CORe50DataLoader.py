@@ -24,14 +24,15 @@ class CORe50DataLoader(object):
         rehearsal_memory_size: int = 0,
         # Not using actual mini-batches larger than 1 anymore, but working with "virtual" mini-batches
         # (One sample fed at a time and model updated after a number of samples equivalent to the mini-batch size)
-        # Any value lower than 1 will lead to loading the entire batch
-        # mini_batch_size: int = 0,
+        # But parameter will be used when needing to keep the proportion of original/rehearsal inside mini-batch
+        mini_batch_size: int = 1,
         batch: int = 0,
         start_run: int = 0,
         start_idx: int = 0,
         initial_batches: list = None,
         use_latent_replay: bool = False,
         randomize_data_order: bool = False,
+        keep_rehearsal_proportion: bool = False,
         # If False, use the default 50 classes; if True, use the 10 categories,
         # by mapping each 5 classes into the corresponding category
         # (one category contains all the 5 different objects for each of the 10 types).
@@ -70,10 +71,12 @@ class CORe50DataLoader(object):
         self.resize_procedure = resize_procedure
         self.in_channels = image_channels
         self.scenario = scenario
+        self.mini_batch_size = mini_batch_size
         self.batch = batch
         self.run = start_run
         self.idx = start_idx
         self.randomize_data_order = randomize_data_order
+        self.keep_rehearsal_proportion = keep_rehearsal_proportion
         self.category_based_split = category_based_split
         self.debug_mode = debug_mode
         self.use_latent_replay = use_latent_replay
@@ -223,12 +226,69 @@ class CORe50DataLoader(object):
             print("Batch size:", len(self.idx_order))
             print("Rehearsal memory actual size:", len(self.rm))
 
+        # Assertion variable
+        expected_len = len(self.idx_order) + len(self.rm)
+
         # Store current batch ids
         self.current_batch = self.idx_order.copy()
 
-        # Add exemplar set to id list if needed
+        # Add exemplar set to id list if it's not empty
         if len(self.rm) > 0 and self.rm[0] not in self.idx_order:
-            self.idx_order += self.rm
+            # Keep original/rehearsal proportion if required
+            if self.keep_rehearsal_proportion:
+                # Store old ids
+                original_idx_order = self.idx_order.copy()
+
+                # Compute number of original/rehearsal
+                rm_actual_size = len(self.rm)
+                n_rehearsal_in_each_mini_batch = int(
+                    (rm_actual_size / (rm_actual_size + len(self.idx_order)))
+                    * self.mini_batch_size
+                )
+                n_original_in_each_mini_batch = (
+                    self.mini_batch_size - n_rehearsal_in_each_mini_batch
+                )
+
+                # Store mixed ids
+                self.idx_order = list()
+
+                if n_rehearsal_in_each_mini_batch > 0:
+                    total_steps = (rm_actual_size // n_rehearsal_in_each_mini_batch) + 1
+                else:
+                    total_steps = 1
+
+                for i in range(total_steps - 1):
+                    temp_list = list()
+
+                    temp_list += original_idx_order[
+                        i
+                        * n_original_in_each_mini_batch : (i + 1)
+                        * n_original_in_each_mini_batch
+                    ]
+                    temp_list += self.rm[
+                        i
+                        * n_rehearsal_in_each_mini_batch : (i + 1)
+                        * n_rehearsal_in_each_mini_batch
+                    ]
+
+                    # Randomize with keeping proportion, if required
+                    if self.randomize_data_order:
+                        random.shuffle(temp_list)
+
+                    self.idx_order += temp_list
+
+                # Add remaining elements
+                temp_list = (
+                    original_idx_order[
+                        (total_steps - 1) * n_original_in_each_mini_batch :
+                    ]
+                    + self.rm[(total_steps - 1) * n_rehearsal_in_each_mini_batch :]
+                )
+                if self.randomize_data_order:
+                    random.shuffle(temp_list)
+                self.idx_order += temp_list
+            else:
+                self.idx_order += self.rm
 
         # Check final size
         if self.debug_mode:
@@ -236,8 +296,11 @@ class CORe50DataLoader(object):
             print()
 
         # Randomize their order if required
-        if self.randomize_data_order:
+        if self.randomize_data_order and not self.keep_rehearsal_proportion:
             self.idx_order = random.sample(self.idx_order, len(self.idx_order))
+
+        # Check resulting batch length
+        assert expected_len == len(self.idx_order)
 
         return None
 
