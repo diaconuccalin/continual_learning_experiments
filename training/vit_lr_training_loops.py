@@ -64,7 +64,10 @@ def vit_lr_epoch(
         indexes_to_store = random.sample(
             list(range(len(data_loader.idx_order))), data_loader.h
         )
-        new_activations_indexes = data_loader.idx_order[indexes_to_store]
+
+        new_activations_indexes = list()
+        for el in indexes_to_store:
+            new_activations_indexes.append(data_loader.idx_order[el])
         new_activations = list()
     else:
         indexes_to_store = None
@@ -168,6 +171,8 @@ def vit_lr_epoch(
                 )
 
         if data_loader.debug_mode:
+            if new_activations_indexes is not None:
+                new_activations = [(None, -1)] * len(new_activations_indexes)
             continue
 
         # Set accumulated model gradients to prepare for update

@@ -193,6 +193,7 @@ def vit_lr_train(
     current_task,
     current_scenario,
     runs,
+    rehearsal_memory_size=0,
     should_validate=False,
     latent_replay_layer=None,
 ):
@@ -268,7 +269,7 @@ def vit_lr_train(
             current_task=current_task,
             current_run=current_run,
             mini_batch_size=128,
-            rehearsal_memory_size=0,
+            rehearsal_memory_size=rehearsal_memory_size,
             learning_rates=learning_rates,
             populate_rm_epochs=populate_rm_batches,
             device=device,
@@ -388,6 +389,7 @@ def main():
                 profiling_activated=profiling_activated,
                 data_loader_debug_mode=data_loader_debug_mode,
                 current_task=current_task,
+                rehearsal_memory_size=rehearsal_memory_size,
                 runs=runs,
                 should_validate=do_validation,
             )
