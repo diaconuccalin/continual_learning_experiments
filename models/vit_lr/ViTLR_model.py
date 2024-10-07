@@ -62,9 +62,14 @@ class ViTLR(nn.Module):
         self.norm = nn.LayerNorm(hidden_dimension, eps=1e-6)
         self.fc = nn.Linear(hidden_dimension, num_classes)
 
-    def forward(self, x):
+    def forward(self, x, get_activation=False):
         # Check whether the input is a pattern (an original image), or a stored activation
         is_pattern, x = x
+
+        # Store activation if passed
+        activation = None
+        if get_activation and not is_pattern:
+            activation = x.clone()
 
         if is_pattern:
             b, c, h, w = x.shape
@@ -89,7 +94,10 @@ class ViTLR(nn.Module):
             f"Expected activation with third shape {self.patch_embedding.out_channels}"
             f", got {x.shape[2]}."
         )
-        x = self.transformer((is_pattern, x))
+        if get_activation and is_pattern:
+            x, activation = self.transformer(x=(is_pattern, x), get_activation=True)
+        else:
+            x = self.transformer(x=(is_pattern, x), get_activation=False)
 
         # b, nph * npw + 1, dim
         x = torch.tanh(x)
@@ -101,7 +109,10 @@ class ViTLR(nn.Module):
         x = self.fc(x)
 
         # b, num_classes
-        return x
+        if not get_activation:
+            return x
+        else:
+            return x, activation
 
     def set_backbone_trainable(self, trainable: bool):
         self.patch_embedding.requires_grad_(trainable)

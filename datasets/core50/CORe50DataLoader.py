@@ -86,6 +86,7 @@ class CORe50DataLoader(object):
         self.batches_so_far = 0
         self.initial_batches = initial_batches
         self.current_batch = list()
+        self.h = 0
 
         self.n_batch = constants.N_BATCH
 
@@ -114,6 +115,7 @@ class CORe50DataLoader(object):
         print("Randomizing data order if required...")
         self.idx_order = None
         self.do_randomization()
+        self.compute_h()
 
     def __iter__(self):
         return self
@@ -244,30 +246,28 @@ class CORe50DataLoader(object):
         self.batch = batch
         self.idx = 0
         self.do_randomization()
+        self.compute_h()
 
         return None
 
     def populate_rm(self):
-        # Compute h
-        h = self.rm_size // (self.batches_so_far + 1)
-
-        # Treat case of h greater than size of current batch
-        if h > len(self.current_batch):
-            h = len(self.current_batch)
-
         # Size of rm to be kept
-        n_ext_mem = self.rm_size - h
+        n_ext_mem = self.rm_size - self.h
 
         # Treat exceptional cases
         assert n_ext_mem >= 0, "Size of rm should never be negative."
-        assert h <= len(self.current_batch), "Not enough patterns in current batch."
-        assert h <= self.rm_size, "Rehearsal memory size exceeded."
+        assert self.h <= len(
+            self.current_batch
+        ), "Not enough patterns in current batch."
+        assert self.h <= self.rm_size, "Rehearsal memory size exceeded."
 
         # Get random h patterns to keep
         if not self.use_latent_replay:
-            r_add = random.sample(self.current_batch, h)
+            r_add = random.sample(self.current_batch, self.h)
         else:
-            assert h == len(self.stored_activations), "Latent replay size mismatch."
+            assert self.h == len(
+                self.stored_activations
+            ), "Latent replay size mismatch."
             r_add = self.stored_activations_indexes
 
         # Manipulate patterns in rm as required
@@ -283,7 +283,7 @@ class CORe50DataLoader(object):
         if self.debug_mode:
             print()
             print("Rehearsal report")
-            print("Required:", h)
+            print("Required:", self.h)
             print("To add:", len(r_add))
             print("Maximum allowed rehearsal memory size:", self.rm_size)
             print("Actual rehearsal memory size:", len(self.rm))
@@ -304,3 +304,11 @@ class CORe50DataLoader(object):
                 found_classes[current_class] = 1
 
         return found_classes
+
+    def compute_h(self):
+        # Compute h
+        self.h = self.rm_size // (self.batches_so_far + 1)
+
+        # Treat case of h greater than size of current batch
+        if self.h > len(self.current_batch):
+            self.h = len(self.current_batch)

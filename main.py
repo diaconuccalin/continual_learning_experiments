@@ -271,9 +271,9 @@ def native_cwr_star_or_ar1_star_free_train(
 
         vit_training_pipeline(
             current_scenario=(
-                PipelineScenario.CWR_STAR
+                PipelineScenario.NATIVE_CWR_STAR
                 if is_cwr_star
-                else PipelineScenario.AR1_STAR_FREE
+                else PipelineScenario.NATIVE_AR1_STAR_FREE
             ),
             batches=batches,
             initial_batches=[
@@ -337,7 +337,7 @@ def native_ar1_star_train(
         )
 
         vit_training_pipeline(
-            current_scenario=PipelineScenario.AR1_STAR,
+            current_scenario=PipelineScenario.NATIVE_AR1_STAR,
             batches=batches,
             initial_batches=[
                 0,

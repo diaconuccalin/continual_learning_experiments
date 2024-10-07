@@ -1,4 +1,5 @@
 import os
+import random
 
 import torch
 from tqdm import tqdm
@@ -50,6 +51,18 @@ def vit_lr_epoch(
     batch_len = len(data_loader.idx_order)
     if mini_batch_size < 1 or mini_batch_size > batch_len:
         mini_batch_size = batch_len
+
+    # Choose activations to store
+    if data_loader.use_latent_replay and current_epoch in populate_rm_epochs:
+        indexes_to_store = random.sample(
+            list(range(len(data_loader.idx_order))), data_loader.h
+        )
+        new_activations_indexes = data_loader.idx_order[indexes_to_store]
+        new_activations = list()
+    else:
+        indexes_to_store = None
+        new_activations_indexes = None
+        new_activations = None
 
     # Setup progress bar for mini-batches smaller than entire batch
     steps_number = batch_len // mini_batch_size
@@ -115,7 +128,13 @@ def vit_lr_epoch(
             y_train = y_train.to(device)
 
             # Forward
-            y_pred = model(x_train)
+            if (indexes_to_store is not None) and (
+                (data_loader.idx - 1) in indexes_to_store
+            ):
+                y_pred, activation = model(x=x_train, get_activation=True)
+                new_activations.append(activation)
+            else:
+                y_pred = model(x=x_train, get_activation=False)
 
             # Backward step
             loss = criterion(y_pred, y_train)
@@ -158,6 +177,11 @@ def vit_lr_epoch(
             progress_bar.set_postfix(
                 loss=sum(losses_list[-mini_batch_size:]) / mini_batch_size
             )
+
+    # Replace activations with new ones
+    if new_activations_indexes is not None:
+        data_loader.stored_activations_indexes = new_activations_indexes
+        data_loader.stored_activations = new_activations
 
     # Populate rehearsal memory
     if current_epoch in populate_rm_epochs:
@@ -237,7 +261,7 @@ def vit_training_pipeline(
     validation_batch=None,
 ):
     # Check that batch-specific weights are provided when dealing with AR1*
-    if current_scenario is PipelineScenario.AR1_STAR:
+    if current_scenario is PipelineScenario.NATIVE_AR1_STAR:
         assert (
             lr_modulation_batch_specific_weights is not None
         ), "Batch-specific weights required for AR1* pipeline!"
@@ -307,9 +331,9 @@ def vit_training_pipeline(
     weights["fc.bias"] = model.fc.bias.data
 
     if current_scenario in [
-        PipelineScenario.CWR_STAR,
-        PipelineScenario.AR1_STAR,
-        PipelineScenario.AR1_STAR_FREE,
+        PipelineScenario.NATIVE_CWR_STAR,
+        PipelineScenario.NATIVE_AR1_STAR,
+        PipelineScenario.NATIVE_AR1_STAR_FREE,
     ]:
         # Prepare consolidated weights (and biases) tensors and other required variables
         cw = torch.zeros(model.fc.weight.shape).to(device)
@@ -344,11 +368,11 @@ def vit_training_pipeline(
     print("Preparing optimizer and loss function...")
 
     # Mark backbone as trainable if required
-    if current_scenario is PipelineScenario.CWR_STAR:
+    if current_scenario is PipelineScenario.NATIVE_CWR_STAR:
         model.set_backbone_trainable(False)
     elif current_scenario in [
-        PipelineScenario.AR1_STAR,
-        PipelineScenario.AR1_STAR_FREE,
+        PipelineScenario.NATIVE_AR1_STAR,
+        PipelineScenario.NATIVE_AR1_STAR_FREE,
     ]:
         model.set_backbone_trainable(True)
 
@@ -363,7 +387,7 @@ def vit_training_pipeline(
         else:
             is_backbone.append(False)
 
-    if current_scenario is PipelineScenario.AR1_STAR:
+    if current_scenario is PipelineScenario.NATIVE_AR1_STAR:
         # Initialize a_star parameters
         f_hat = list()
         f = list()
@@ -458,9 +482,9 @@ def vit_training_pipeline(
                 data_loader.idx = 0
 
                 if current_scenario in [
-                    PipelineScenario.CWR_STAR,
-                    PipelineScenario.AR1_STAR,
-                    PipelineScenario.AR1_STAR_FREE,
+                    PipelineScenario.NATIVE_CWR_STAR,
+                    PipelineScenario.NATIVE_AR1_STAR,
+                    PipelineScenario.NATIVE_AR1_STAR_FREE,
                 ]:
                     # Find classes occurring in the current batch (and their occurrence count)
                     cur = data_loader.get_classes_in_current_batch()
@@ -474,14 +498,14 @@ def vit_training_pipeline(
                         model.fc.bias.data[j] = cb[j]
 
                     # Freeze backbone if required
-                    if current_scenario == PipelineScenario.CWR_STAR:
+                    if current_scenario == PipelineScenario.NATIVE_CWR_STAR:
                         if current_epoch == 1:
                             model.set_backbone_trainable(True)
                         else:
                             model.set_backbone_trainable(False)
                     elif current_scenario in [
-                        PipelineScenario.AR1_STAR,
-                        PipelineScenario.AR1_STAR_FREE,
+                        PipelineScenario.NATIVE_AR1_STAR,
+                        PipelineScenario.NATIVE_AR1_STAR_FREE,
                     ]:
                         model.set_backbone_trainable(True)
                 else:
@@ -510,9 +534,9 @@ def vit_training_pipeline(
                 )
 
                 if current_scenario in [
-                    PipelineScenario.CWR_STAR,
-                    PipelineScenario.AR1_STAR,
-                    PipelineScenario.AR1_STAR_FREE,
+                    PipelineScenario.NATIVE_CWR_STAR,
+                    PipelineScenario.NATIVE_AR1_STAR,
+                    PipelineScenario.NATIVE_AR1_STAR_FREE,
                 ]:
                     print("\nUpdating consolidated weights...\n")
                     # Update consolidated weights
@@ -534,7 +558,7 @@ def vit_training_pipeline(
                         past[j] += cur[j]
 
                     # Update AR1* parameters
-                    if current_scenario is PipelineScenario.AR1_STAR:
+                    if current_scenario is PipelineScenario.NATIVE_AR1_STAR:
                         optimizer.update_a1_star_params(batch_counter)
 
                     # Save cwr parameters
@@ -557,7 +581,7 @@ def vit_training_pipeline(
                             ),
                         )
 
-                        if current_scenario is PipelineScenario.AR1_STAR:
+                        if current_scenario is PipelineScenario.NATIVE_AR1_STAR:
                             print("\nSaving AR1* parameters...\n")
                             torch.save(
                                 {
@@ -578,9 +602,9 @@ def vit_training_pipeline(
     print("\nSaving final model...\n")
 
     if current_scenario in [
-        PipelineScenario.CWR_STAR,
-        PipelineScenario.AR1_STAR,
-        PipelineScenario.AR1_STAR_FREE,
+        PipelineScenario.NATIVE_CWR_STAR,
+        PipelineScenario.NATIVE_AR1_STAR,
+        PipelineScenario.NATIVE_AR1_STAR_FREE,
     ]:
         model.fc.weight.data = cw
         model.fc.bias.data = cb

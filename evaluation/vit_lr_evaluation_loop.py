@@ -98,7 +98,7 @@ def vit_lr_evaluation_pipeline(
         x_train = vit_lr_image_preprocessing(x=x_train, device=device)
 
         y_train = y_train.item()
-        y_pred = torch.argmax(model(x_train)).item()
+        y_pred = torch.argmax(model(x=x_train, get_activation=False)).item()
 
         all_y_trains.append(y_train)
         all_y_preds.append(y_pred)

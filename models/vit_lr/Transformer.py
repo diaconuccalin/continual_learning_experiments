@@ -37,7 +37,7 @@ class Transformer(nn.Module):
             ]
         )
 
-    def forward(self, x):
+    def forward(self, x, get_activation=False):
         is_pattern, x = x
 
         if is_pattern:
@@ -46,7 +46,13 @@ class Transformer(nn.Module):
             assert self.latent_replay_block > -1, "Latent replay block not set."
             blocks_to_run = self.blocks[self.latent_replay_block :]
 
-        for block in blocks_to_run:
+        activation = None
+        for i, block in enumerate(blocks_to_run):
+            if get_activation and i == self.latent_replay_block:
+                activation = x.clone()
             x = block(x)
 
-        return x
+        if get_activation:
+            return x, activation
+        else:
+            return x
