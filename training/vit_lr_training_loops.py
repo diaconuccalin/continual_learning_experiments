@@ -571,6 +571,9 @@ def vit_training_pipeline(
                                 ),
                             )
 
+    if data_loader_debug_mode:
+        return None
+
     # Update and save final model
     print("\nSaving final model...\n")
 

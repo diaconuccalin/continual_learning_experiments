@@ -59,6 +59,10 @@ class CORe50DataLoader(object):
         # Check if proper scenario
         assert scenario in NEW_TO_OLD_NAMES.values(), "Provided scenario not allowed."
 
+        # Print latent replay information
+        if debug_mode:
+            print("USING" if use_latent_replay else "NOT USING", "LATENT REPLAY.\n\n")
+
         # Extract class variables
         self.root = os.path.abspath(root)
         self.original_image_size = original_image_size
