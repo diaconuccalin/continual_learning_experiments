@@ -186,7 +186,11 @@ class CORe50DataLoader(object):
         if self.debug_mode:
             return None, None
 
-        return x, torch.from_numpy(y).to(torch.long)
+        # Transform to tensor when not working on activations
+        if isinstance(y, np.ndarray):
+            y = torch.from_numpy(y).to(torch.long)
+
+        return x, y
 
     def get_image_from_path(self, path):
         # Prepare variable to store the image

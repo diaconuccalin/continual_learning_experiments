@@ -49,7 +49,7 @@ class Transformer(nn.Module):
         activation = None
         for i, block in enumerate(blocks_to_run):
             if get_activation and i == self.latent_replay_block:
-                activation = x.clone()
+                activation = x.clone().detach()
             x = block(x)
 
         if get_activation:

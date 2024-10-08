@@ -29,6 +29,12 @@ def fastexp_gist(x):
 def vit_lr_image_preprocessing(x, device=None):
     is_pattern, x = x
 
+    if not is_pattern:
+        if device is not None:
+            x = x.to(device)
+
+        return is_pattern, x
+
     x = x.astype(np.float32)
 
     x /= 255

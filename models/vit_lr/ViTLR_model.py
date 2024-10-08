@@ -69,7 +69,7 @@ class ViTLR(nn.Module):
         # Store activation if passed
         activation = None
         if get_activation and not is_pattern:
-            activation = x.clone()
+            activation = x.clone().detach()
 
         if is_pattern:
             b, c, h, w = x.shape
@@ -114,7 +114,7 @@ class ViTLR(nn.Module):
         else:
             return x, activation
 
-    def set_backbone_trainable(
+    def set_backbone_requires_grad(
         self, trainable: bool, only_before_lr_layer: bool = False
     ):
         self.patch_embedding.requires_grad_(trainable)

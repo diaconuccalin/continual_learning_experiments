@@ -65,13 +65,15 @@ def vit_lr_epoch(
             list(range(len(data_loader.idx_order))), data_loader.h
         )
 
-        new_activations_indexes = list()
+        potential_new_activations_indexes = list()
+        actual_new_activations_indexes = list()
         for el in indexes_to_store:
-            new_activations_indexes.append(data_loader.idx_order[el])
+            potential_new_activations_indexes.append(data_loader.idx_order[el])
         new_activations = list()
     else:
         indexes_to_store = None
-        new_activations_indexes = None
+        potential_new_activations_indexes = None
+        actual_new_activations_indexes = None
         new_activations = None
 
     # Setup progress bar for mini-batches smaller than entire batch
@@ -143,8 +145,14 @@ def vit_lr_epoch(
             ):
                 y_pred, activation = model(x=x_train, get_activation=True)
                 new_activations.append((activation, y_pred))
+                actual_new_activations_indexes.append(data_loader.idx - 1)
             else:
                 y_pred = model(x=x_train, get_activation=False)
+
+            if not x_train[0]:
+                print(x_train[1])
+                print(x_train[1].requires_grad)
+                print(type(x_train[1]))
 
             # Backward step
             loss = criterion(y_pred, y_train)
@@ -171,8 +179,8 @@ def vit_lr_epoch(
                 )
 
         if data_loader.debug_mode:
-            if new_activations_indexes is not None:
-                new_activations = [(None, -1)] * len(new_activations_indexes)
+            if potential_new_activations_indexes is not None:
+                new_activations = [(None, -1)] * len(potential_new_activations_indexes)
             continue
 
         # Set accumulated model gradients to prepare for update
@@ -191,9 +199,10 @@ def vit_lr_epoch(
             )
 
     # Replace activations with new ones
-    if new_activations_indexes is not None:
-        data_loader.stored_activations_indexes = new_activations_indexes
+    if potential_new_activations_indexes is not None:
+        data_loader.stored_activations_indexes = actual_new_activations_indexes
         data_loader.stored_activations = new_activations
+        data_loader.h = len(actual_new_activations_indexes)
 
     # Populate rehearsal memory
     if current_epoch in populate_rm_epochs:
@@ -368,9 +377,9 @@ def vit_training_pipeline(
     # Set whether backbone is trainable
     print("Marking backbone as trainable or not...")
     if current_scenario in PIPELINES_WITH_FROZEN_BACKBONE:
-        model.set_backbone_trainable(False)
+        model.set_backbone_requires_grad(False)
     else:
-        model.set_backbone_trainable(True)
+        model.set_backbone_requires_grad(True)
 
     # Move model to GPU
     model.to(device)
@@ -501,16 +510,16 @@ def vit_training_pipeline(
                     # Freeze backbone if required
                     if current_scenario in CWR_STAR_PIPELINES:
                         if current_epoch in initial_batches:
-                            model.set_backbone_trainable(True)
+                            model.set_backbone_requires_grad(True)
                         else:
-                            model.set_backbone_trainable(False)
+                            model.set_backbone_requires_grad(False)
                     elif current_scenario not in LR_PIPELINES:
-                        model.set_backbone_trainable(True)
+                        model.set_backbone_requires_grad(True)
                     elif current_scenario in LR_PIPELINES:
                         if current_epoch in initial_batches:
-                            model.set_backbone_trainable(True)
+                            model.set_backbone_requires_grad(True)
                         else:
-                            model.set_backbone_trainable(
+                            model.set_backbone_requires_grad(
                                 False, only_before_lr_layer=True
                             )
                             model.set_layer_norm_trainable()
