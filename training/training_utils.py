@@ -27,13 +27,17 @@ def sgd_with_lr_modulation(
     head_lr: float,
     max_f: float,
 ):
-    assert (
-        len(params) == len(d_p_list) == len(is_backbone)
-    ), "Issue with the optimizer provided parameters! Check their creation in the corresponding training loop."
+    assert len(params) == len(d_p_list) == len(is_backbone), (
+        "Issue with the optimizer provided parameters! Check their creation in the corresponding training loop. "
+        "The number of parameters, d_p and is_backbone should be the same, but got "
+        "{} parameters, {} d_p and {} is_backbone."
+    ).format(len(params), len(d_p_list), len(is_backbone))
     if f_hat is not None:
-        assert (
-            len(params) == len(f_hat) == len(sum_l_k) == len(t_k)
-        ), "Issue with the AR1* optimizer provided parameters! Check their creation in the corresponding training loop."
+        assert len(params) == len(f_hat) == len(sum_l_k) == len(t_k), (
+            "Issue with the AR1* optimizer provided parameters! Check their creation in the corresponding training "
+            "loop. The number of parameters, f_hat, sum_l_k and t_k should be the same, but got {} parameters, "
+            "{} f_hat, {} sum_l_k and {} t_k."
+        ).format(len(params), len(f_hat), len(sum_l_k), len(t_k))
 
     for i, param in enumerate(params):
         # Prepare AR1* parameters

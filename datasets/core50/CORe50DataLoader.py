@@ -179,16 +179,15 @@ class CORe50DataLoader(object):
             else:
                 y = np.array([y], dtype=np.int64)
 
+            # Transform to tensor
+            y = torch.from_numpy(y).to(torch.long)
+
         # Increment current index
         self.idx += 1
 
         # Don't load images in debug mode
         if self.debug_mode:
             return None, None
-
-        # Transform to tensor when not working on activations
-        if isinstance(y, np.ndarray):
-            y = torch.from_numpy(y).to(torch.long)
 
         return x, y
 
@@ -319,7 +318,7 @@ class CORe50DataLoader(object):
 
     def populate_rm(self):
         # Size of rm to be kept
-        n_ext_mem = self.rm_size - self.h
+        n_ext_mem = min(self.rm_size - self.h, len(self.rm))
 
         # Treat exceptional cases
         assert n_ext_mem >= 0, "Size of rm should never be negative."

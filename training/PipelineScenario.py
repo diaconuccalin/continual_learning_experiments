@@ -27,12 +27,6 @@ PIPELINES_WITH_LR_MODULATION = [
     PipelineScenario.LR_AR1_STAR,
 ]
 
-PIPELINES_WITH_FROZEN_BACKBONE = [
-    PipelineScenario.NATIVE_CUMULATIVE,
-    PipelineScenario.NATIVE_CWR_STAR,
-    PipelineScenario.LR_CWR_STAR,
-]
-
 LR_PIPELINES = [
     PipelineScenario.LR_CWR_STAR,
     PipelineScenario.LR_AR1_STAR,

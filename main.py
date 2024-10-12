@@ -92,6 +92,15 @@ def create_arg_parser():
         required=False,
         default=False,
     )
+    parser.add_argument(
+        "--latent_replay_layer",
+        "-lr_layer",
+        help="Defines the index of the transformer block to be used as latent replay layer. "
+        + "Defaults to -1, which is allowed in all non-AR1* [free] pipelines, that have a predetermined LR layer.",
+        type=int,
+        required=False,
+        default=-1,
+    )
 
     return parser
 
@@ -263,9 +272,7 @@ def vit_lr_train(
         vit_training_pipeline(
             current_scenario=current_scenario,
             batches=batches,
-            initial_batches=[
-                0,
-            ],
+            initial_batches=[0],
             current_task=current_task,
             current_run=current_run,
             mini_batch_size=128,
@@ -301,6 +308,7 @@ def main():
     do_validation = args.do_validation
     data_loader_debug_mode = args.data_loader_debug_mode
     current_task = args.current_task
+    latent_replay_layer = args.latent_replay_layer
 
     # Check if pipeline is supported
     available_pipelines = [
@@ -392,6 +400,7 @@ def main():
                 rehearsal_memory_size=rehearsal_memory_size,
                 runs=runs,
                 should_validate=do_validation,
+                latent_replay_layer=latent_replay_layer,
             )
 
     return None

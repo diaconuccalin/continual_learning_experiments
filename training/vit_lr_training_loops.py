@@ -20,7 +20,6 @@ from training.PipelineScenario import (
     PIPELINES_WITH_LR_MODULATION,
     LR_PIPELINES,
     PIPELINES_WITH_RM,
-    PIPELINES_WITH_FROZEN_BACKBONE,
     AR1_STAR_PURE_PIPELINES,
     CWR_STAR_PIPELINES,
 )
@@ -61,17 +60,12 @@ def vit_lr_epoch(
 
     # Choose activations to store
     if data_loader.use_latent_replay and current_epoch in populate_rm_epochs:
-        indexes_to_store = random.sample(
-            list(range(len(data_loader.idx_order))), data_loader.h
+        potential_new_activations_indexes = random.sample(
+            data_loader.idx_order, data_loader.h
         )
-
-        potential_new_activations_indexes = list()
         actual_new_activations_indexes = list()
-        for el in indexes_to_store:
-            potential_new_activations_indexes.append(data_loader.idx_order[el])
         new_activations = list()
     else:
-        indexes_to_store = None
         potential_new_activations_indexes = None
         actual_new_activations_indexes = None
         new_activations = None
@@ -114,7 +108,11 @@ def vit_lr_epoch(
         optimizer.zero_grad()
 
         # Prepare gradient accumulator
-        grads = list()
+        grads = dict()
+        number_of_encounters = dict()
+        for name, _ in model.named_parameters():
+            grads[name] = None
+            number_of_encounters[name] = 0
 
         # Setup progress bar for mini-batches of the same size as the entire batch
         if steps_number <= 1:
@@ -140,19 +138,15 @@ def vit_lr_epoch(
             y_train = y_train.to(device)
 
             # Forward
-            if (indexes_to_store is not None) and (
-                (data_loader.idx - 1) in indexes_to_store
+            if (potential_new_activations_indexes is not None) and (
+                (data_loader.idx_order[data_loader.idx - 1])
+                in potential_new_activations_indexes
             ):
                 y_pred, activation = model(x=x_train, get_activation=True)
-                new_activations.append((activation, y_pred))
+                new_activations.append((activation, y_train))
                 actual_new_activations_indexes.append(data_loader.idx - 1)
             else:
                 y_pred = model(x=x_train, get_activation=False)
-
-            if not x_train[0]:
-                print(x_train[1])
-                print(x_train[1].requires_grad)
-                print(type(x_train[1]))
 
             # Backward step
             loss = criterion(y_pred, y_train)
@@ -162,13 +156,14 @@ def vit_lr_epoch(
             losses_list.append(loss.item())
 
             # Accumulate model gradients
-            if len(grads) == 0:
-                for el in model.parameters():
-                    grads.append(el.grad)
-            else:
-                for i, el in enumerate(model.parameters()):
-                    if grads[i] is not None:
-                        grads[i] += el.grad
+            for name, el in model.named_parameters():
+                if el.grad is not None:
+                    number_of_encounters[name] += 1
+
+                if grads[name] is None:
+                    grads[name] = el.grad
+                elif el.grad is not None:
+                    grads[name] += el.grad
 
             # Reset model gradients
             model.zero_grad()
@@ -184,9 +179,9 @@ def vit_lr_epoch(
             continue
 
         # Set accumulated model gradients to prepare for update
-        for i, el in enumerate(model.parameters()):
-            if grads[i] is not None:
-                el.grad = grads[i] / mini_batch_size
+        for name, el in model.named_parameters():
+            if grads[name] is not None:
+                el.grad = grads[name] / number_of_encounters[name]
 
         # Update model
         optimizer.current_epoch = current_epoch - 1
@@ -374,12 +369,8 @@ def vit_training_pipeline(
         )
     model.load_state_dict(weights)
 
-    # Set whether backbone is trainable
-    print("Marking backbone as trainable or not...")
-    if current_scenario in PIPELINES_WITH_FROZEN_BACKBONE:
-        model.set_backbone_requires_grad(False)
-    else:
-        model.set_backbone_requires_grad(True)
+    # Set backbone as trainable (it will be changed according to the scenario and current epoch)
+    model.set_backbone_requires_grad(True)
 
     # Move model to GPU
     model.to(device)
@@ -391,22 +382,22 @@ def vit_training_pipeline(
     print("Preparing optimizer and loss function...")
 
     # Mark backbone trainable parameters
-    is_backbone = list()
+    is_backbone = dict()
     for name, param in model.named_parameters():
         if not param.requires_grad:
             continue
 
         if "fc." not in name:
-            is_backbone.append(True)
+            is_backbone[name] = True
         else:
-            is_backbone.append(False)
+            is_backbone[name] = False
 
     if current_scenario in AR1_STAR_PURE_PIPELINES:
         # Initialize a_star parameters
-        f_hat = list()
-        f = list()
-        sum_l_k = list()
-        t_k = list()
+        f_hat = dict()
+        f = dict()
+        sum_l_k = dict()
+        t_k = dict()
 
         for name, param in model.named_parameters():
             # Required, since in the optimizer, only params with grads will be considered
@@ -415,25 +406,25 @@ def vit_training_pipeline(
 
             if "fc." not in name:
                 # Treat backbone parameters
-                f_hat.append(torch.zeros_like(param).to(device).requires_grad_(False))
-                f.append(torch.zeros_like(param).to(device).requires_grad_(False))
-                sum_l_k.append(torch.zeros_like(param).to(device).requires_grad_(False))
-                t_k.append(torch.zeros_like(param).to(device).requires_grad_(False))
+                f_hat[name] = torch.zeros_like(param).to(device).requires_grad_(False)
+                f[name] = torch.zeros_like(param).to(device).requires_grad_(False)
+                sum_l_k[name] = torch.zeros_like(param).to(device).requires_grad_(False)
+                t_k[name] = torch.zeros_like(param).to(device).requires_grad_(False)
             else:
                 # Treat head (tw/temporary weights) parameters
-                f_hat.append(None)
-                f.append(None)
-                sum_l_k.append(None)
-                t_k.append(None)
+                f_hat[name] = None
+                f[name] = None
+                sum_l_k[name] = None
+                t_k[name] = None
 
         optimizer = CustomSGD(
             model.parameters(),
-            is_backbone=is_backbone,
+            is_backbone=list(is_backbone.values()),
             w=lr_modulation_batch_specific_weights,
-            f_hat=f_hat,
-            f=f,
-            sum_l_k=sum_l_k,
-            t_k=t_k,
+            f_hat=list(f_hat.values()),
+            f=list(f.values()),
+            sum_l_k=list(sum_l_k.values()),
+            t_k=list(t_k.values()),
             lr=learning_rates,
             momentum=momentum,
             weight_decay=l2,
@@ -448,7 +439,7 @@ def vit_training_pipeline(
 
         optimizer = CustomSGD(
             model.parameters(),
-            is_backbone=is_backbone,
+            is_backbone=list(is_backbone.values()),
             lr=learning_rates,
             momentum=momentum,
             weight_decay=l2,
@@ -508,22 +499,52 @@ def vit_training_pipeline(
                         model.fc.bias.data[j] = cb[j]
 
                     # Freeze backbone if required
-                    if current_scenario in CWR_STAR_PIPELINES:
-                        if current_epoch in initial_batches:
-                            model.set_backbone_requires_grad(True)
-                        else:
-                            model.set_backbone_requires_grad(False)
-                    elif current_scenario not in LR_PIPELINES:
+                    if data_loader.batches_so_far in initial_batches:
                         model.set_backbone_requires_grad(True)
-                    elif current_scenario in LR_PIPELINES:
-                        if current_epoch in initial_batches:
-                            model.set_backbone_requires_grad(True)
-                        else:
+                    elif current_scenario in CWR_STAR_PIPELINES:
+                        model.set_backbone_requires_grad(False)
+
+                        optimizer.is_backbone = [
+                            is_backbone[name]
+                            for name, el in model.named_parameters()
+                            if el.requires_grad
+                        ]
+                    else:
+                        if current_scenario in LR_PIPELINES:
                             model.set_backbone_requires_grad(
                                 False, only_before_lr_layer=True
                             )
-                            model.set_layer_norm_trainable()
 
+                            optimizer.is_backbone = [
+                                is_backbone[name]
+                                for name, el in model.named_parameters()
+                                if el.requires_grad
+                            ]
+
+                            if current_scenario in AR1_STAR_PURE_PIPELINES:
+                                optimizer.f_hat = [
+                                    f_hat[name]
+                                    for name, el in model.named_parameters()
+                                    if el.requires_grad
+                                ]
+
+                                optimizer.f = [
+                                    f[name]
+                                    for name, el in model.named_parameters()
+                                    if el.requires_grad
+                                ]
+
+                                optimizer.sum_l_k = [
+                                    sum_l_k[name]
+                                    for name, el in model.named_parameters()
+                                    if el.requires_grad
+                                ]
+
+                                optimizer.t_k = [
+                                    t_k[name]
+                                    for name, el in model.named_parameters()
+                                    if el.requires_grad
+                                ]
                 else:
                     cur = None
 

@@ -135,6 +135,8 @@ class ViTLR(nn.Module):
             if transformer_block.attn.proj_out.bias is not None:
                 transformer_block.attn.proj_out.bias.requires_grad_(False)
 
+        self.set_layer_norm_trainable()
+
     def set_layer_norm_trainable(self):
         for transformer_block in self.transformer.blocks:
             transformer_block.norm1.requires_grad_(True)
