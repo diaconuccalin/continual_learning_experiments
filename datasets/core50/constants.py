@@ -45,51 +45,61 @@ NIC_POPULATE_RM_EPOCHS = [
 
 # Class names
 CORE50_CLASS_NAMES = [
+    # 0
     "adapter1",
     "adapter2",
     "adapter3",
     "adapter4",
     "adapter5",
+    # 5
     "mobile_phone1",
     "mobile_phone2",
     "mobile_phone3",
     "mobile_phone4",
     "mobile_phone5",
+    # 10
     "scissors1",
     "scissors2",
     "scissors3",
     "scissors4",
     "scissors5",
+    # 15
     "light_bulb1",
     "light_bulb2",
     "light_bulb3",
     "light_bulb4",
     "light_bulb5",
+    # 20
     "can1",
     "can2",
     "can3",
     "can4",
     "can5",
+    # 25
     "glasses1",
     "glasses2",
     "glasses3",
     "glasses4",
     "glasses5",
+    # 30
     "ball1",
     "ball2",
     "ball3",
     "ball4",
     "ball5",
+    # 35
     "marker1",
     "marker2",
     "marker3",
     "marker4",
     "marker5",
+    # 40
     "cup1",
     "cup2",
     "cup3",
     "cup4",
     "cup5",
+    # 45
     "remote_control1",
     "remote_control2",
     "remote_control3",

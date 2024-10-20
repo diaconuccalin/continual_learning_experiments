@@ -296,6 +296,7 @@ class CORe50DataLoader(object):
         # Check final size
         if self.debug_mode:
             print("Total size:", len(self.idx_order))
+            print("Occurring classes:", self.get_classes_in_current_batch())
             print()
 
         # Randomize their order if required
@@ -369,7 +370,7 @@ class CORe50DataLoader(object):
             else:
                 found_classes[current_class] = 1
 
-        return found_classes
+        return dict(sorted(found_classes.items()))
 
     def compute_h(self):
         # Compute h

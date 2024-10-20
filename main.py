@@ -316,11 +316,11 @@ def main():
         "vit_lr_core50_evaluation",
         "native_cumulative_train",  # PipelineScenario.NATIVE_CUMULATIVE
         "native_cwr_star_train",  # PipelineScenario.NATIVE_CWR_STAR
-        "native_ar1_star_train",  # PipelineScenario.NATIVE_AR1_STAR_FREE
-        "native_ar1_star_free_train",
-        "lr_cwr_star_train",
-        "lr_ar1_star_train",
-        "lr_ar1_star_free_train",
+        "native_ar1_star_train",  # PipelineScenario.NATIVE_AR1_STAR
+        "native_ar1_star_free_train",  # PipelineScenario.NATIVE_AR1_STAR_FREE
+        "lr_cwr_star_train",  # PipelineScenario.LR_CWR_STAR
+        "lr_ar1_star_train",  # PipelineScenario.LR_AR1_STAR
+        "lr_ar1_star_free_train",  # PipelineScenario.LR_AR1_STAR_FREE
     ]
     assert (
         pipeline in available_pipelines
