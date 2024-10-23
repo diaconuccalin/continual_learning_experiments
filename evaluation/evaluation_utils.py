@@ -1,5 +1,8 @@
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 
 
 def plot_confusion_matrix(conf_mat, labels, category_based_split, save_location):
@@ -105,3 +108,36 @@ def plot_losses(losses, save_location):
 
     # Save plot
     plt.savefig(save_location)
+
+
+def plot_ar1_star_f_hat(all_f_hat, current_batch, session_name):
+    # Generate histogram
+    hist = torch.histc(all_f_hat)
+
+    # Extract minimum and maximum values
+    mn = all_f_hat.min().item()
+    mx = all_f_hat.max().item()
+
+    # Clear previous plots
+    plt.clf()
+
+    # Bar plot histogram
+    plt.bar(
+        np.arange(mn, mx + 0.001 * mx, (mx - mn) / 99),
+        hist.cpu(),
+        width=(mx - mn) / 150,
+    )
+
+    # Change y-scale to logarithmic
+    plt.yscale("log")
+
+    # Adapt ticks to existent values
+    plt.xticks(
+        np.round(np.arange(mn, mx + 0.1 * mx, (mx - mn) / 10), decimals=6), fontsize=5
+    )
+
+    # Save figure
+    root_path = os.path.join("evaluation_results", session_name, "plots")
+    if not os.path.exists(root_path):
+        os.makedirs(root_path)
+    plt.savefig(os.path.join(root_path, f"f_hat_{current_batch}.png"))

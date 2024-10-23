@@ -19,7 +19,7 @@ def sgd_with_lr_modulation(
     is_backbone: List[bool],
     f_hat: List[Tensor],
     sum_l_k: List[Tensor],
-    t_k: List[Tensor],
+    previous_weights: List[Tensor],
     momentum_buffer_list: List[Optional[Tensor]],
     weight_decay: float,
     momentum: float,
@@ -33,11 +33,11 @@ def sgd_with_lr_modulation(
         "{} parameters, {} d_p and {} is_backbone."
     ).format(len(params), len(d_p_list), len(is_backbone))
     if f_hat is not None:
-        assert len(params) == len(f_hat) == len(sum_l_k) == len(t_k), (
+        assert len(params) == len(f_hat) == len(sum_l_k) == len(previous_weights), (
             "Issue with the AR1* optimizer provided parameters! Check their creation in the corresponding training "
-            "loop. The number of parameters, f_hat, sum_l_k and t_k should be the same, but got {} parameters, "
-            "{} f_hat, {} sum_l_k and {} t_k."
-        ).format(len(params), len(f_hat), len(sum_l_k), len(t_k))
+            "loop. The number of parameters, f_hat, sum_l_k and previous_weights should be the same,"
+            "but got {} parameters, {} f_hat, {} sum_l_k and {} previous_weights."
+        ).format(len(params), len(f_hat), len(sum_l_k), len(previous_weights))
 
     for i, param in enumerate(params):
         # Prepare AR1* parameters
@@ -70,8 +70,7 @@ def sgd_with_lr_modulation(
             param.add_((1 - (f_hat[i] / max_f)) * d_p, alpha=-backbone_lr)
 
             # Do necessary updates for AR1*
-            sum_l_k[i] += (initial_param - params[i]) * initial_d_p
-            t_k[i] = params[i] - initial_param
+            sum_l_k[i] += (params[i] - initial_param) * initial_d_p
 
         # Release memory
         del initial_param

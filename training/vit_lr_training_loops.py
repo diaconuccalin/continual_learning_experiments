@@ -395,9 +395,8 @@ def vit_training_pipeline(
     if current_scenario in AR1_STAR_PURE_PIPELINES:
         # Initialize a_star parameters
         f_hat = dict()
-        f = dict()
         sum_l_k = dict()
-        t_k = dict()
+        previous_weights = dict()
 
         for name, param in model.named_parameters():
             # Required, since in the optimizer, only params with grads will be considered
@@ -407,24 +406,23 @@ def vit_training_pipeline(
             if "fc." not in name:
                 # Treat backbone parameters
                 f_hat[name] = torch.zeros_like(param).to(device).requires_grad_(False)
-                f[name] = torch.zeros_like(param).to(device).requires_grad_(False)
                 sum_l_k[name] = torch.zeros_like(param).to(device).requires_grad_(False)
-                t_k[name] = torch.zeros_like(param).to(device).requires_grad_(False)
+                previous_weights[name] = (
+                    param.clone().detach().to(device).requires_grad_(False)
+                )
             else:
                 # Treat head (tw/temporary weights) parameters
                 f_hat[name] = None
-                f[name] = None
                 sum_l_k[name] = None
-                t_k[name] = None
+                previous_weights[name] = None
 
         optimizer = CustomSGD(
             model.parameters(),
             is_backbone=list(is_backbone.values()),
             w=lr_modulation_batch_specific_weights,
             f_hat=list(f_hat.values()),
-            f=list(f.values()),
             sum_l_k=list(sum_l_k.values()),
-            t_k=list(t_k.values()),
+            previous_weights=list(previous_weights.values()),
             lr=learning_rates,
             momentum=momentum,
             weight_decay=l2,
@@ -433,9 +431,8 @@ def vit_training_pipeline(
         )
     else:
         f_hat = None
-        f = None
         sum_l_k = None
-        t_k = None
+        previous_weights = None
 
         optimizer = CustomSGD(
             model.parameters(),
@@ -528,20 +525,14 @@ def vit_training_pipeline(
                                     if el.requires_grad
                                 ]
 
-                                optimizer.f = [
-                                    f[name]
-                                    for name, el in model.named_parameters()
-                                    if el.requires_grad
-                                ]
-
                                 optimizer.sum_l_k = [
                                     sum_l_k[name]
                                     for name, el in model.named_parameters()
                                     if el.requires_grad
                                 ]
 
-                                optimizer.t_k = [
-                                    t_k[name]
+                                optimizer.previous_weights = [
+                                    previous_weights[name]
                                     for name, el in model.named_parameters()
                                     if el.requires_grad
                                 ]
@@ -591,8 +582,17 @@ def vit_training_pipeline(
                         past[j] += cur[j]
 
                     # Update AR1* parameters
-                    if current_scenario in AR1_STAR_PURE_PIPELINES:
-                        optimizer.update_a1_star_params(batch_counter)
+                    if current_scenario in AR1_STAR_PURE_PIPELINES and (
+                        (batch_counter < (len(batches) - 1))
+                        and current_batch != batches[batch_counter + 1]
+                    ):
+                        print("\nUpdating AR1* parameters...\n")
+                        optimizer.update_a1_star_params(
+                            batch_counter,
+                            debug_mode=data_loader_debug_mode,
+                            session_name=session_name,
+                            device=device,
+                        )
 
                     # Save cwr parameters
                     if (
@@ -613,20 +613,6 @@ def vit_training_pipeline(
                                 save_path, "cwr_e" + str(current_epoch) + ".pth"
                             ),
                         )
-
-                        if current_scenario in AR1_STAR_PURE_PIPELINES:
-                            print("\nSaving AR1* parameters...\n")
-                            torch.save(
-                                {
-                                    "f_hat": f_hat,
-                                    "f": f,
-                                    "sum_l_k": sum_l_k,
-                                    "t_k": t_k,
-                                },
-                                os.path.join(
-                                    save_path, "ar1_e" + str(current_epoch) + ".pth"
-                                ),
-                            )
 
     if data_loader_debug_mode:
         return None

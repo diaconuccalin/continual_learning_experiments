@@ -1,6 +1,7 @@
 import torch
 from torch.optim.optimizer import Optimizer, _use_grad_for_differentiable
 
+from evaluation.evaluation_utils import plot_ar1_star_f_hat
 from training.training_utils import sgd_with_lr_modulation
 
 
@@ -11,9 +12,8 @@ class CustomSGD(Optimizer):
         is_backbone,
         w=None,
         f_hat=None,
-        f=None,
         sum_l_k=None,
-        t_k=None,
+        previous_weights=None,
         lr=None,
         momentum=0,
         weight_decay=0,
@@ -35,9 +35,8 @@ class CustomSGD(Optimizer):
         self.xi = xi
 
         self.f_hat = f_hat
-        self.f = f
         self.sum_l_k = sum_l_k
-        self.t_k = t_k
+        self.previous_weights = previous_weights
 
         self.current_epoch = 0
 
@@ -81,7 +80,7 @@ class CustomSGD(Optimizer):
                 is_backbone=self.is_backbone,
                 f_hat=self.f_hat,
                 sum_l_k=self.sum_l_k,
-                t_k=self.t_k,
+                previous_weights=self.previous_weights,
                 momentum_buffer_list=momentum_buffer_list,
                 weight_decay=group["weight_decay"],
                 momentum=group["momentum"],
@@ -96,13 +95,57 @@ class CustomSGD(Optimizer):
 
         return None
 
-    def update_a1_star_params(self, current_batch):
+    def update_a1_star_params(
+        self, current_batch, debug_mode=False, session_name=None, device=None
+    ):
+        # In debug mode, store f_hat values for plotting
+        if debug_mode:
+            assert (device is not None) and (
+                session_name is not None
+            ), "In debug mode, device needs to be passed to the update_a1_star_params method."
+            all_f_hat = torch.empty(0).to(device)
+        else:
+            all_f_hat = None
+
+        # Save current weights to use them in updating f_hat and storing them for the next AR1* iteration
+        current_weights = list()
+        for el in self.param_groups[0]["params"]:
+            if el.grad is not None:
+                current_weights.append(el.clone().detach().requires_grad_(False))
+        assert len(current_weights) == len(self.previous_weights), (
+            "Expected t_k to be the same length as the number of parameters, actually got: "
+            + str(len(current_weights))
+            + " vs "
+            + str(len(self.previous_weights))
+        )
+
+        # Update AR1* values
         for i in range(len(self.f_hat)):
             if self.f_hat[i] is not None:
-                self.f_hat[i] = self.sum_l_k[i] / (self.t_k[i] ** 2 + self.xi)
-                self.f[i] = self.f[i] + self.w[current_batch] * self.f_hat[i]
-                self.f_hat[i] = torch.clip(
-                    input=self.f[i], max=self.max_f, out=self.f_hat[i]
+                # Compute new f_hat
+                self.f_hat[i] = (self.w[current_batch] * self.sum_l_k[i]) / (
+                    (self.previous_weights[i] - current_weights[i]) ** 2 + self.xi
                 )
+
+                # Clip f_hat
+                self.f_hat[i] = torch.clip(
+                    input=self.f_hat[i], min=0.0, max=self.max_f, out=self.f_hat[i]
+                )
+
+                # Reset sum_l_k and store current weights in previous weights list
+                self.sum_l_k[i].zero_()
+                self.previous_weights[i] = current_weights[i]
+
+                # Store f_hat values for plotting
+                if debug_mode:
+                    all_f_hat = torch.cat((all_f_hat, self.f_hat[i].flatten()))
+
+        # Plot f_hat values
+        if debug_mode:
+            plot_ar1_star_f_hat(
+                all_f_hat=all_f_hat,
+                current_batch=current_batch,
+                session_name=session_name,
+            )
 
         return None
