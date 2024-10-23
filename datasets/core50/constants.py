@@ -12,6 +12,7 @@ NC_TRAINING_BATCHES = list(range(9))
 NC_TESTING_BATCH = 9
 
 NIC_CUMULATIVE_TRAINING_BATCHES = [el for el in range(391) for _ in range(4)]
+NIC_SINGLE_CUMULATIVE_TRAINING_BATCHES = [el for el in range(391)]
 NIC_CUMULATIVE_TESTING_BATCH = 391
 
 # AR1* batch-specific weights

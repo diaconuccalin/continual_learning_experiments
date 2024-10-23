@@ -4,11 +4,9 @@ import torch
 from torch import Tensor
 
 CONSTANT_TRAINING_PARAMETERS = {
-    "epochs_per_batch": 1,
     "momentum": 0.9,
     "l2": 0.0005,
     "input_image_size": (384, 384),
-    "num_layers": 12,
     "pretrained_weights_path": "weights/pretrained_imagenet/B_16_imagenet1k.pth",
 }
 

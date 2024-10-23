@@ -6,7 +6,7 @@ from models.vit_lr.TransformerBlock import TransformerBlock
 class Transformer(nn.Module):
     def __init__(
         self,
-        num_layers,
+        num_blocks,
         dim,
         num_heads,
         tgt_len,
@@ -19,7 +19,7 @@ class Transformer(nn.Module):
 
         # Set latent replay block
         assert (
-            -1 <= latent_replay_block < num_layers
+            -1 <= latent_replay_block < num_blocks
         ), "Invalid latent replay block selection."
         self.latent_replay_block = latent_replay_block
 
@@ -33,7 +33,7 @@ class Transformer(nn.Module):
                     dropout=dropout,
                     device=device,
                 )
-                for _ in range(num_layers)
+                for _ in range(num_blocks)
             ]
         )
 

@@ -22,6 +22,7 @@ from training.PipelineScenario import (
     PIPELINES_WITH_RM,
     AR1_STAR_PURE_PIPELINES,
     CWR_STAR_PIPELINES,
+    PipelineScenario,
 )
 
 
@@ -36,8 +37,9 @@ def vit_lr_epoch(
     session_name,
     save_dir_path,
     model_saving_frequency,
+    current_scenario,
     current_run,
-    num_layers,
+    num_blocks,
     populate_rm_epochs,
     category_based_split,
     device,
@@ -193,16 +195,19 @@ def vit_lr_epoch(
                 loss=sum(losses_list[-mini_batch_size:]) / mini_batch_size
             )
 
-    # Replace activations with new ones
-    if potential_new_activations_indexes is not None:
-        data_loader.stored_activations_indexes = actual_new_activations_indexes
-        data_loader.stored_activations = new_activations
-        data_loader.h = len(actual_new_activations_indexes)
+    if current_scenario in PIPELINES_WITH_RM:
+        # Replace activations with new ones
+        if (current_scenario in PIPELINES_WITH_LR_MODULATION) and (
+            potential_new_activations_indexes is not None
+        ):
+            data_loader.stored_activations_indexes = actual_new_activations_indexes
+            data_loader.stored_activations = new_activations
+            data_loader.h = len(actual_new_activations_indexes)
 
-    # Populate rehearsal memory
-    if current_epoch in populate_rm_epochs:
-        print("\nPopulating rehearsal memory...\n")
-        data_loader.populate_rm()
+        # Populate rehearsal memory
+        if current_epoch in populate_rm_epochs:
+            print("\nPopulating rehearsal memory...\n")
+            data_loader.populate_rm()
 
     # Save model only when debug mode is not active
     if not data_loader.debug_mode and (
@@ -227,7 +232,7 @@ def vit_lr_epoch(
             input_image_size=data_loader.input_image_size,
             current_task=data_loader.scenario,
             current_run=current_run,
-            num_layers=num_layers,
+            num_blocks=num_blocks,
             category_based_split=category_based_split,
             device=device,
             model=model,
@@ -256,7 +261,7 @@ def vit_training_pipeline(
     input_image_size,
     current_task,
     current_run,
-    num_layers,
+    num_blocks,
     mini_batch_size,
     rehearsal_memory_size,
     populate_rm_epochs,
@@ -298,7 +303,11 @@ def vit_training_pipeline(
         image_channels=3,
         scenario=current_task,
         rehearsal_memory_size=rehearsal_memory_size,
-        batch=batches[0],
+        batch=(
+            batches
+            if current_scenario is PipelineScenario.NATIVE_CUMULATIVE
+            else batches[0]
+        ),
         start_run=current_run,
         initial_batches=initial_batches,
         use_latent_replay=current_scenario in LR_PIPELINES,
@@ -330,7 +339,7 @@ def vit_training_pipeline(
     # Generate model object
     model = ViTLR(
         device=device,
-        num_layers=num_layers,
+        num_blocks=num_blocks,
         input_size=input_image_size,
         num_classes=num_classes,
         latent_replay_layer=latent_replay_layer,
@@ -360,13 +369,25 @@ def vit_training_pipeline(
         cw = cb = past = w_past = None
 
     # Required because the proj_out layer is not present in the default ViT
-    for i in range(num_layers):
+    for i in range(num_blocks):
         # torch.eye is an identity matrix
         weights["transformer.blocks." + str(i) + ".attn.proj_out.weight"] = torch.eye(
             n=model.state_dict()[
                 "transformer.blocks." + str(i) + ".attn.proj_out.weight"
             ].shape[0]
         )
+
+    # Remove unused transformer blocks
+    keys_to_delete = list()
+    for i in range(num_blocks, 12):
+        for el in weights.keys():
+            if "transformer.blocks." + str(i) + "." in el:
+                keys_to_delete.append(el)
+
+    for key in keys_to_delete:
+        weights.pop(key)
+
+    # Actually load weights into model
     model.load_state_dict(weights)
 
     # Set backbone as trainable (it will be changed according to the scenario and current epoch)
@@ -450,7 +471,6 @@ def vit_training_pipeline(
 
     if epochs_per_batch < 1:
         # Set data loader parameters
-        data_loader.update_batch(0)
         data_loader.idx = 0
 
         # Run epoch
@@ -465,8 +485,9 @@ def vit_training_pipeline(
             session_name=session_name,
             save_dir_path=save_path,
             model_saving_frequency=model_saving_frequency,
+            current_scenario=current_scenario,
             current_run=current_run,
-            num_layers=num_layers,
+            num_blocks=num_blocks,
             populate_rm_epochs=populate_rm_epochs,
             category_based_split=category_based_split,
             device=device,
@@ -551,8 +572,9 @@ def vit_training_pipeline(
                     session_name=session_name,
                     save_dir_path=save_path,
                     model_saving_frequency=model_saving_frequency,
+                    current_scenario=current_scenario,
                     current_run=current_run,
-                    num_layers=num_layers,
+                    num_blocks=num_blocks,
                     populate_rm_epochs=populate_rm_epochs,
                     category_based_split=category_based_split,
                     device=device,

@@ -13,7 +13,7 @@ class ViTLR(nn.Module):
         in_channels: int = 3,
         hidden_dimension: int = 768,
         patch_size: tuple[int, int] = (16, 16),
-        num_layers: int = 12,
+        num_blocks: int = 12,
         num_heads: int = 12,
         ff_dim: int = 3072,
         dropout_rate: float = 0.1,
@@ -49,7 +49,7 @@ class ViTLR(nn.Module):
         )
 
         self.transformer = Transformer(
-            num_layers=num_layers,
+            num_blocks=num_blocks,
             dim=hidden_dimension,
             num_heads=num_heads,
             tgt_len=self.seq_len,

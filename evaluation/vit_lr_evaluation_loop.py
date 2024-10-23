@@ -18,7 +18,7 @@ def vit_lr_evaluation_pipeline(
     input_image_size,
     current_task,
     current_run,
-    num_layers,
+    num_blocks,
     category_based_split,
     device,
     weights_path=None,
@@ -55,7 +55,7 @@ def vit_lr_evaluation_pipeline(
         # Prepare model
         model = ViTLR(
             device=device,
-            num_layers=num_layers,
+            num_blocks=num_blocks,
             input_size=input_image_size,
             num_classes=num_classes,
             dropout_rate=0.0,

@@ -20,6 +20,7 @@ from datasets.core50.constants import (
     NI_POPULATE_RM_EPOCHS,
     NC_POPULATE_RM_EPOCHS,
     NIC_POPULATE_RM_EPOCHS,
+    NIC_SINGLE_CUMULATIVE_TRAINING_BATCHES,
 )
 from evaluation.evaluation_utils import plot_confusion_matrix, plot_losses
 from evaluation.vit_lr_evaluation_loop import vit_lr_evaluation_pipeline
@@ -78,6 +79,15 @@ def create_arg_parser():
         default=[0],
     )
     parser.add_argument(
+        "--n_blocks",
+        help="Defines the number of transformer blocks to be included in the ViT model. "
+        + "Defaults to 12 and accepts integer values between 1 and 12. "
+        + "More values can be passed using the format val1,val2,val3...",
+        type=lambda arg: list(map(int, arg.split(","))),
+        required=False,
+        default=[12],
+    )
+    parser.add_argument(
         "--do_validation",
         "-val",
         help="Activates validation step after each epoch, defaults to False.",
@@ -105,35 +115,6 @@ def create_arg_parser():
     return parser
 
 
-def vit_demo_naive_finetune(
-    device,
-    session_name,
-    category_based_split,
-    profiling_activated,
-    current_task,
-    should_validate,
-):
-    vit_training_pipeline(
-        current_scenario=PipelineScenario.NATIVE_CUMULATIVE,
-        batches=NI_TRAINING_BATCHES,
-        populate_rm_epochs=NI_POPULATE_RM_EPOCHS,
-        initial_batches=[
-            0,
-        ],
-        current_task=current_task,
-        mini_batch_size=32,
-        rehearsal_memory_size=0,
-        device=device,
-        session_name=session_name,
-        randomize_data_order=True,
-        category_based_split=category_based_split,
-        profiling_activated=profiling_activated,
-        should_validate=should_validate,
-        validation_batch=NI_TESTING_BATCH,
-        **CONSTANT_TRAINING_PARAMETERS,
-    )
-
-
 def vit_lr_core50_evaluation(device, weights_path, category_based_split, current_task):
     # Choose batch
     if current_task == "ni":
@@ -150,7 +131,7 @@ def vit_lr_core50_evaluation(device, weights_path, category_based_split, current
         input_image_size=(384, 384),
         current_task=current_task,
         current_run=0,
-        num_layers=12,
+        num_blocks=12,
         weights_path=weights_path,
         device=device,
         category_based_split=category_based_split,
@@ -201,6 +182,7 @@ def vit_lr_train(
     data_loader_debug_mode,
     current_task,
     current_scenario,
+    n_blocks,
     runs,
     rehearsal_memory_size=0,
     should_validate=False,
@@ -226,7 +208,10 @@ def vit_lr_train(
         if current_scenario in PIPELINES_WITH_LR_MODULATION:
             lr_modulation_batch_specific_weights = NC_BATCH_SPECIFIC_WEIGHTS
     elif current_task in ["nic", "nicv2_391"]:
-        batches = NIC_CUMULATIVE_TRAINING_BATCHES
+        if current_scenario == PipelineScenario.NATIVE_CUMULATIVE:
+            batches = NIC_SINGLE_CUMULATIVE_TRAINING_BATCHES
+        else:
+            batches = NIC_CUMULATIVE_TRAINING_BATCHES
         validation_batch = NIC_CUMULATIVE_TESTING_BATCH
 
         if current_scenario in PIPELINES_WITH_RM:
@@ -249,9 +234,8 @@ def vit_lr_train(
         learning_rates = AR1_STAR_FREE_LEARNING_RATES
     else:
         learning_rates = [
-            0.01,
+            (0.01, 0.01),
         ] * len(batches)
-        model_saving_frequency = 1
 
     if current_scenario == PipelineScenario.LR_CWR_STAR:
         latent_replay_layer = 11
@@ -269,29 +253,44 @@ def vit_lr_train(
             "---------------",
         )
 
-        vit_training_pipeline(
-            current_scenario=current_scenario,
-            batches=batches,
-            initial_batches=[0],
-            current_task=current_task,
-            current_run=current_run,
-            mini_batch_size=128,
-            rehearsal_memory_size=rehearsal_memory_size,
-            learning_rates=learning_rates,
-            populate_rm_epochs=populate_rm_batches,
-            device=device,
-            session_name=session_name + "_run_" + str(current_run),
-            lr_modulation_batch_specific_weights=lr_modulation_batch_specific_weights,
-            model_saving_frequency=model_saving_frequency,
-            randomize_data_order=True,
-            category_based_split=False,
-            profiling_activated=profiling_activated,
-            data_loader_debug_mode=data_loader_debug_mode,
-            should_validate=should_validate,
-            validation_batch=validation_batch,
-            latent_replay_layer=latent_replay_layer,
-            **CONSTANT_TRAINING_PARAMETERS,
-        )
+        for num_blocks in n_blocks:
+            print(
+                "--------------- Starting training with",
+                num_blocks,
+                "blocks ---------------",
+            )
+
+            vit_training_pipeline(
+                current_scenario=current_scenario,
+                batches=batches,
+                initial_batches=[0],
+                current_task=current_task,
+                current_run=current_run,
+                num_blocks=num_blocks,
+                mini_batch_size=128,
+                epochs_per_batch=(
+                    -1 if current_scenario is PipelineScenario.NATIVE_CUMULATIVE else 1
+                ),
+                rehearsal_memory_size=rehearsal_memory_size,
+                learning_rates=learning_rates,
+                populate_rm_epochs=populate_rm_batches,
+                device=device,
+                session_name=session_name
+                + "_run_"
+                + str(current_run)
+                + "_blocks_"
+                + str(num_blocks),
+                lr_modulation_batch_specific_weights=lr_modulation_batch_specific_weights,
+                model_saving_frequency=model_saving_frequency,
+                randomize_data_order=True,
+                category_based_split=False,
+                profiling_activated=profiling_activated,
+                data_loader_debug_mode=data_loader_debug_mode,
+                should_validate=should_validate,
+                validation_batch=validation_batch,
+                latent_replay_layer=latent_replay_layer,
+                **CONSTANT_TRAINING_PARAMETERS,
+            )
 
 
 def main():
@@ -305,6 +304,7 @@ def main():
     profiling_activated = args.profile
     rehearsal_memory_sizes = args.rehearsal_memory_size
     runs = args.runs
+    n_blocks = args.n_blocks
     do_validation = args.do_validation
     data_loader_debug_mode = args.data_loader_debug_mode
     current_task = args.current_task
@@ -312,8 +312,7 @@ def main():
 
     # Check if pipeline is supported
     available_pipelines = [
-        "vit_demo_naive_finetune",
-        "vit_lr_core50_evaluation",
+        "core50_evaluation",
         "native_cumulative_train",  # PipelineScenario.NATIVE_CUMULATIVE
         "native_cwr_star_train",  # PipelineScenario.NATIVE_CWR_STAR
         "native_ar1_star_train",  # PipelineScenario.NATIVE_AR1_STAR
@@ -341,16 +340,7 @@ def main():
         device = torch.device("cpu")
 
     # Run chosen pipeline
-    if pipeline == "vit_demo_naive_finetune":
-        vit_demo_naive_finetune(
-            device=device,
-            session_name=session_name,
-            category_based_split=False,
-            profiling_activated=profiling_activated,
-            current_task=current_task,
-            should_validate=do_validation,
-        )
-    elif pipeline == "vit_lr_core50_evaluation":
+    if pipeline == "vit_lr_core50_evaluation":
         vit_lr_core50_evaluation(
             device=device,
             weights_path=weights_path,
@@ -365,6 +355,7 @@ def main():
             profiling_activated=profiling_activated,
             data_loader_debug_mode=data_loader_debug_mode,
             current_task=current_task,
+            n_blocks=n_blocks,
             runs=runs,
             should_validate=do_validation,
         )
@@ -399,6 +390,7 @@ def main():
                 current_task=current_task,
                 rehearsal_memory_size=rehearsal_memory_size,
                 runs=runs,
+                n_blocks=n_blocks,
                 should_validate=do_validation,
                 latent_replay_layer=latent_replay_layer,
             )
