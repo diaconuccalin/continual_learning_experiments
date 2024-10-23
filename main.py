@@ -131,7 +131,6 @@ def vit_lr_core50_evaluation(device, weights_path, category_based_split, current
         input_image_size=(384, 384),
         current_task=current_task,
         current_run=0,
-        num_blocks=12,
         weights_path=weights_path,
         device=device,
         category_based_split=category_based_split,
@@ -340,7 +339,7 @@ def main():
         device = torch.device("cpu")
 
     # Run chosen pipeline
-    if pipeline == "vit_lr_core50_evaluation":
+    if pipeline == "core50_evaluation":
         vit_lr_core50_evaluation(
             device=device,
             weights_path=weights_path,

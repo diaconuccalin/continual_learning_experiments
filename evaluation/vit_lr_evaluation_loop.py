@@ -18,7 +18,6 @@ def vit_lr_evaluation_pipeline(
     input_image_size,
     current_task,
     current_run,
-    num_blocks,
     category_based_split,
     device,
     weights_path=None,
@@ -52,15 +51,6 @@ def vit_lr_evaluation_pipeline(
 
     losses = None
     if weights_path is not None:
-        # Prepare model
-        model = ViTLR(
-            device=device,
-            num_blocks=num_blocks,
-            input_size=input_image_size,
-            num_classes=num_classes,
-            dropout_rate=0.0,
-        )
-
         # Load stored information
         print("Loading pretrained model...")
         weights = torch.load(weights_path, weights_only=False, map_location=device)
@@ -71,6 +61,23 @@ def vit_lr_evaluation_pipeline(
         if "model_state_dict" in weights.keys():
             weights = weights["model_state_dict"]
 
+        # Find number of blocks
+        max_block = 0
+        for el in weights.keys():
+            if "blocks" in el:
+                current_block = int(el.split(".")[2])
+
+                if current_block > max_block:
+                    max_block = current_block
+
+        # Prepare and load model
+        model = ViTLR(
+            device=device,
+            num_blocks=max_block + 1,
+            input_size=input_image_size,
+            num_classes=num_classes,
+            dropout_rate=0.0,
+        )
         model.load_state_dict(weights)
 
     # Move model to GPU
