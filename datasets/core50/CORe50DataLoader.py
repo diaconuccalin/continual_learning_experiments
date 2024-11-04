@@ -332,9 +332,16 @@ class CORe50DataLoader(object):
         if not self.use_latent_replay:
             r_add = random.sample(self.current_batch, self.h)
         else:
-            assert self.h == len(
-                self.stored_activations
-            ), "Latent replay size mismatch."
+            assert (
+                self.h
+                == len(self.stored_activations_indexes)
+                == len(self.stored_activations)
+            ), (
+                "Latent replay size mismatch! Expected "
+                + str(self.h)
+                + ", got "
+                + str(len(self.stored_activations_indexes))
+            )
             r_add = self.stored_activations_indexes
 
         # Manipulate patterns in rm as required

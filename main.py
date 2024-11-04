@@ -27,7 +27,7 @@ from evaluation.vit_lr_evaluation_loop import vit_lr_evaluation_pipeline
 from training.PipelineScenario import (
     PipelineScenario,
     PIPELINES_WITH_RM,
-    PIPELINES_WITH_LR_MODULATION,
+    PIPELINES_WITH_LEARNING_RATE_MODULATION,
     CWR_STAR_PIPELINES,
     AR1_STAR_PURE_PIPELINES,
     AR1_STAR_FREE_PIPELINES,
@@ -35,6 +35,20 @@ from training.PipelineScenario import (
 )
 from training.training_utils import CONSTANT_TRAINING_PARAMETERS
 from training.vit_lr_training_loops import vit_training_pipeline
+
+
+def get_cuda_device():
+    cuda_device = None
+    if torch.cuda.is_available():
+        if cuda_device is None:
+            cuda_device = torch.cuda.device_count() - 1
+        device = torch.device("cuda:" + str(cuda_device))
+        print("DEVICE SET TO GPU " + str(cuda_device) + "!\n")
+    else:
+        print("DEVICE SET TO CPU!\n")
+        device = torch.device("cpu")
+
+    return device
 
 
 def create_arg_parser():
@@ -116,6 +130,9 @@ def create_arg_parser():
 
 
 def vit_lr_core50_evaluation(device, weights_path, category_based_split, current_task):
+    # Remove current dir path from weights path
+    weights_path = weights_path.replace(os.getcwd() + "/", "")
+
     # Choose batch
     if current_task == "ni":
         batch = NI_TESTING_BATCH
@@ -196,7 +213,7 @@ def vit_lr_train(
 
         if current_scenario in PIPELINES_WITH_RM:
             populate_rm_batches = NI_POPULATE_RM_EPOCHS
-        if current_scenario in PIPELINES_WITH_LR_MODULATION:
+        if current_scenario in PIPELINES_WITH_LEARNING_RATE_MODULATION:
             lr_modulation_batch_specific_weights = NI_BATCH_SPECIFIC_WEIGHTS
     elif current_task in ["nc", "multi-task-nc"]:
         batches = NC_TRAINING_BATCHES
@@ -204,7 +221,7 @@ def vit_lr_train(
 
         if current_scenario in PIPELINES_WITH_RM:
             populate_rm_batches = NC_POPULATE_RM_EPOCHS
-        if current_scenario in PIPELINES_WITH_LR_MODULATION:
+        if current_scenario in PIPELINES_WITH_LEARNING_RATE_MODULATION:
             lr_modulation_batch_specific_weights = NC_BATCH_SPECIFIC_WEIGHTS
     elif current_task in ["nic", "nicv2_391"]:
         if current_scenario == PipelineScenario.NATIVE_CUMULATIVE:
@@ -215,7 +232,7 @@ def vit_lr_train(
 
         if current_scenario in PIPELINES_WITH_RM:
             populate_rm_batches = NIC_POPULATE_RM_EPOCHS
-        if current_scenario in PIPELINES_WITH_LR_MODULATION:
+        if current_scenario in PIPELINES_WITH_LEARNING_RATE_MODULATION:
             lr_modulation_batch_specific_weights = NIC_BATCH_SPECIFIC_WEIGHTS
     else:
         raise ValueError("Invalid task name!")
@@ -327,16 +344,8 @@ def main():
     # Set seed
     torch.manual_seed(42)
 
-    # Set cuda device
-    cuda_device = None
-    if torch.cuda.is_available():
-        if cuda_device is None:
-            cuda_device = torch.cuda.device_count() - 1
-        device = torch.device("cuda:" + str(cuda_device))
-        print("DEVICE SET TO GPU " + str(cuda_device) + "!\n")
-    else:
-        print("DEVICE SET TO CPU!\n")
-        device = torch.device("cpu")
+    # Get cuda device
+    device = get_cuda_device()
 
     # Run chosen pipeline
     if pipeline == "core50_evaluation":

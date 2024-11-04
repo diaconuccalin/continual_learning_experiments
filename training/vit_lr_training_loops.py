@@ -17,7 +17,7 @@ from models.vit_lr.ViTLR_model import ViTLR
 from models.vit_lr.vit_lr_utils import vit_lr_image_preprocessing
 from training.CustomSGD import CustomSGD
 from training.PipelineScenario import (
-    PIPELINES_WITH_LR_MODULATION,
+    PIPELINES_WITH_LEARNING_RATE_MODULATION,
     LR_PIPELINES,
     PIPELINES_WITH_RM,
     AR1_STAR_PURE_PIPELINES,
@@ -197,7 +197,7 @@ def vit_lr_epoch(
 
     if current_scenario in PIPELINES_WITH_RM:
         # Replace activations with new ones
-        if (current_scenario in PIPELINES_WITH_LR_MODULATION) and (
+        if (current_scenario in LR_PIPELINES) and (
             potential_new_activations_indexes is not None
         ):
             data_loader.stored_activations_indexes = actual_new_activations_indexes
@@ -282,7 +282,7 @@ def vit_training_pipeline(
     validation_batch=None,
 ):
     # Check that batch-specific weights are provided when dealing with AR1*
-    if current_scenario in PIPELINES_WITH_LR_MODULATION:
+    if current_scenario in PIPELINES_WITH_LEARNING_RATE_MODULATION:
         assert (
             lr_modulation_batch_specific_weights is not None
         ), "Batch-specific weights required for AR1* pipeline!"
