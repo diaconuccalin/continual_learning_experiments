@@ -235,9 +235,7 @@ class CORe50DataLoader(object):
         # Store current batch ids
         self.current_batch = self.idx_order.copy()
 
-        # Add exemplar set to id list if it's not empty
-        if len(self.rm) > 0 and self.rm[0] not in self.idx_order:
-            # Keep original/rehearsal proportion if required
+        if len(self.rm) > 0:
             if self.keep_rehearsal_proportion:
                 # Store old ids
                 original_idx_order = self.idx_order.copy()
