@@ -235,6 +235,7 @@ class CORe50DataLoader(object):
         # Store current batch ids
         self.current_batch = self.idx_order.copy()
 
+        # Add exemplar set to id list if it's not empty
         if len(self.rm) > 0:
             if self.keep_rehearsal_proportion:
                 # Store old ids
@@ -321,13 +322,18 @@ class CORe50DataLoader(object):
 
         # Treat exceptional cases
         assert n_ext_mem >= 0, "Size of rm should never be negative."
-        assert self.h <= len(
-            self.current_batch
-        ), "Not enough patterns in current batch."
         assert self.h <= self.rm_size, "Rehearsal memory size exceeded."
 
         # Get random h patterns to keep
         if not self.use_latent_replay:
+            assert self.h <= len(self.current_batch), (
+                "Not enough patterns in current batch. Expected at least "
+                + str(self.h)
+                + ", got "
+                + str(len(self.current_batch))
+                + "."
+            )
+
             r_add = random.sample(self.current_batch, self.h)
         else:
             assert (
@@ -339,7 +345,9 @@ class CORe50DataLoader(object):
                 + str(self.h)
                 + ", got "
                 + str(len(self.stored_activations_indexes))
+                + "."
             )
+
             r_add = self.stored_activations_indexes
 
         # Manipulate patterns in rm as required
