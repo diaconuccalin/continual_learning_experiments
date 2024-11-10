@@ -117,13 +117,14 @@ def create_arg_parser():
         default=False,
     )
     parser.add_argument(
-        "--latent_replay_layer",
+        "--latent_replay_layers",
         "-lr_layer",
         help="Defines the index of the transformer block to be used as latent replay layer. "
-        + "Defaults to -1, which is allowed in all non-AR1* [free] pipelines, that have a predetermined LR layer.",
-        type=int,
+        + "Defaults to -1, which is allowed in all non-AR1* [free] pipelines, that have a predetermined LR layer."
+        + "More values can be passed using the format val1,val2,val3...",
+        type=lambda arg: list(map(int, arg.split(","))),
         required=False,
-        default=-1,
+        default=[-1],
     )
 
     return parser
@@ -202,7 +203,7 @@ def vit_lr_train(
     runs,
     rehearsal_memory_size=0,
     should_validate=False,
-    latent_replay_layer=None,
+    latent_replay_layers=None,
 ):
     # Choose batches
     populate_rm_batches = None
@@ -254,13 +255,13 @@ def vit_lr_train(
         ] * len(batches)
 
     if current_scenario == PipelineScenario.LR_CWR_STAR:
-        latent_replay_layer = 11
+        latent_replay_layers = [11]
     elif current_scenario in LR_PIPELINES:
         assert (
-            latent_replay_layer is not None
+            latent_replay_layers is not None
         ), "Latent replay layer must be set for current scenario."
     else:
-        latent_replay_layer = -1
+        latent_replay_layers = -1
 
     for current_run in runs:
         print(
@@ -276,37 +277,46 @@ def vit_lr_train(
                 "blocks ---------------",
             )
 
-            vit_training_pipeline(
-                current_scenario=current_scenario,
-                batches=batches,
-                initial_batches=[0],
-                current_task=current_task,
-                current_run=current_run,
-                num_blocks=num_blocks,
-                mini_batch_size=128,
-                epochs_per_batch=(
-                    -1 if current_scenario is PipelineScenario.NATIVE_CUMULATIVE else 1
-                ),
-                rehearsal_memory_size=rehearsal_memory_size,
-                learning_rates=learning_rates,
-                populate_rm_epochs=populate_rm_batches,
-                device=device,
-                session_name=session_name
-                + "_run_"
-                + str(current_run)
-                + "_blocks_"
-                + str(num_blocks),
-                lr_modulation_batch_specific_weights=lr_modulation_batch_specific_weights,
-                model_saving_frequency=model_saving_frequency,
-                randomize_data_order=True,
-                category_based_split=False,
-                profiling_activated=profiling_activated,
-                data_loader_debug_mode=data_loader_debug_mode,
-                should_validate=should_validate,
-                validation_batch=validation_batch,
-                latent_replay_layer=latent_replay_layer,
-                **CONSTANT_TRAINING_PARAMETERS,
-            )
+            for lr_layer in latent_replay_layers:
+                print(
+                    "--------------- Starting training with latent replay layer",
+                    lr_layer,
+                    "---------------",
+                )
+
+                vit_training_pipeline(
+                    current_scenario=current_scenario,
+                    batches=batches,
+                    initial_batches=[0],
+                    current_task=current_task,
+                    current_run=current_run,
+                    num_blocks=num_blocks,
+                    mini_batch_size=128,
+                    epochs_per_batch=(
+                        -1 if current_scenario is PipelineScenario.NATIVE_CUMULATIVE else 1
+                    ),
+                    rehearsal_memory_size=rehearsal_memory_size,
+                    learning_rates=learning_rates,
+                    populate_rm_epochs=populate_rm_batches,
+                    device=device,
+                    session_name=session_name
+                    + "_run_"
+                    + str(current_run)
+                    + "_blocks_"
+                    + str(num_blocks)
+                    + "_lr_layer_"
+                    + str(lr_layer),
+                    lr_modulation_batch_specific_weights=lr_modulation_batch_specific_weights,
+                    model_saving_frequency=model_saving_frequency,
+                    randomize_data_order=True,
+                    category_based_split=False,
+                    profiling_activated=profiling_activated,
+                    data_loader_debug_mode=data_loader_debug_mode,
+                    should_validate=should_validate,
+                    validation_batch=validation_batch,
+                    latent_replay_layer=lr_layer,
+                    **CONSTANT_TRAINING_PARAMETERS,
+                )
 
 
 def main():
@@ -324,7 +334,7 @@ def main():
     do_validation = args.do_validation
     data_loader_debug_mode = args.data_loader_debug_mode
     current_task = args.current_task
-    latent_replay_layer = args.latent_replay_layer
+    latent_replay_layers = args.latent_replay_layers
 
     # Check if pipeline is supported
     available_pipelines = [
@@ -400,7 +410,7 @@ def main():
                 runs=runs,
                 n_blocks=n_blocks,
                 should_validate=do_validation,
-                latent_replay_layer=latent_replay_layer,
+                latent_replay_layers=latent_replay_layers,
             )
 
     return None

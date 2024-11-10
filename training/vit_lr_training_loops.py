@@ -234,7 +234,6 @@ def vit_lr_epoch(
             input_image_size=data_loader.input_image_size,
             current_task=data_loader.scenario,
             current_run=current_run,
-            num_blocks=num_blocks,
             category_based_split=category_based_split,
             device=device,
             model=model,
