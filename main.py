@@ -293,7 +293,9 @@ def vit_lr_train(
                     num_blocks=num_blocks,
                     mini_batch_size=128,
                     epochs_per_batch=(
-                        -1 if current_scenario is PipelineScenario.NATIVE_CUMULATIVE else 1
+                        -1
+                        if current_scenario is PipelineScenario.NATIVE_CUMULATIVE
+                        else 1
                     ),
                     rehearsal_memory_size=rehearsal_memory_size,
                     learning_rates=learning_rates,

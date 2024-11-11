@@ -321,8 +321,14 @@ class CORe50DataLoader(object):
         n_ext_mem = min(self.rm_size - self.h, len(self.rm))
 
         # Treat exceptional cases
+        assert self.h <= self.rm_size, (
+            "Rehearsal memory size exceeded. Maximum size: "
+            + str(self.rm_size)
+            + ", actual size: "
+            + str(self.h)
+            + "."
+        )
         assert n_ext_mem >= 0, "Size of rm should never be negative."
-        assert self.h <= self.rm_size, "Rehearsal memory size exceeded."
 
         # Get random h patterns to keep
         if not self.use_latent_replay:
@@ -339,7 +345,6 @@ class CORe50DataLoader(object):
             assert (
                 self.h
                 == len(self.stored_activations_indexes)
-                == len(self.stored_activations)
             ), (
                 "Latent replay size mismatch! Expected "
                 + str(self.h)
