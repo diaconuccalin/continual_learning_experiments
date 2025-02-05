@@ -261,7 +261,7 @@ def vit_lr_train(
             latent_replay_layers is not None
         ), "Latent replay layer must be set for current scenario."
     else:
-        latent_replay_layers = -1
+        latent_replay_layers = [-1]
 
     for current_run in runs:
         print(

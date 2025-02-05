@@ -273,7 +273,7 @@ class CORe50DataLoader(object):
                         * n_rehearsal_in_each_mini_batch
                     ]
 
-                    # Randomize with keeping proportion, if required
+                    # Randomize with keeping proportions, if required
                     if self.randomize_data_order:
                         random.shuffle(temp_list)
 
@@ -342,10 +342,7 @@ class CORe50DataLoader(object):
 
             r_add = random.sample(self.current_batch, self.h)
         else:
-            assert (
-                self.h
-                == len(self.stored_activations_indexes)
-            ), (
+            assert self.h == len(self.stored_activations_indexes), (
                 "Latent replay size mismatch! Expected "
                 + str(self.h)
                 + ", got "
